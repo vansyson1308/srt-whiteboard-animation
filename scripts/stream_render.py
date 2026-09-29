@@ -47,6 +47,15 @@ def _imread_any(path: str | Path, flags: int = cv2.IMREAD_COLOR) -> np.ndarray |
     return cv2.imdecode(raw, flags)
 
 
+def _imwrite_any(path: str | Path, img: np.ndarray, params: Sequence[int] = ()) -> bool:
+    """cv2.imwrite that also works with non-ASCII (e.g. Vietnamese) Windows paths."""
+    ext = Path(path).suffix or ".png"
+    ok, buf = cv2.imencode(ext, img, list(params))
+    if ok:
+        buf.tofile(str(path))
+    return bool(ok)
+
+
 # ──────────────────────────────────────────────────────────────
 # 渲染参数集中处
 # ──────────────────────────────────────────────────────────────

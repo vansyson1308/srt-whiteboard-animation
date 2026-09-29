@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <!-- Cảnh 3: tán xạ Rayleigh -->
+  <g id="molecules" data-label="Phân tử không khí" data-say="phân tử">
+    <g fill="#ffffff" stroke="#2b2b2b" stroke-width="5">
+      <circle cx="760" cy="300" r="26"/><circle cx="880" cy="380" r="22"/><circle cx="700" cy="430" r="20"/>
+      <circle cx="960" cy="260" r="18"/><circle cx="820" cy="500" r="24"/><circle cx="1010" cy="460" r="20"/>
+    </g>
+    <text x="640" y="610" font-family="Patrick Hand" font-size="42" fill="#2b2b2b">phân tử khí</text>
+  </g>
+  <g id="sunray" data-label="Tia nắng tới" data-say="va vào">
+    <circle cx="130" cy="150" r="70" fill="#f6c453" stroke="#2b2b2b" stroke-width="6"/>
+    <path d="M205 200 L 730 290" fill="none" stroke="#e8743b" stroke-width="8" stroke-linecap="round"/>
+    <path d="M700 265 L 735 291 L 695 305" fill="none" stroke="#e8743b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="scatter" data-label="Ánh xanh tán xạ" data-say="tán xạ ra mọi hướng">
+    <g fill="none" stroke="#3b7dd8" stroke-width="7" stroke-linecap="round">
+      <path d="M800 290 q 30 -40 60 -10 t 60 -10 t 60 -30"/>
+      <path d="M760 270 q -20 -40 10 -70 t 10 -70"/>
+      <path d="M735 320 q -40 20 -70 -5 t -70 5 t -70 -5"/>
+      <path d="M790 330 q 20 40 60 40 t 50 50 t 60 40"/>
+      <path d="M760 330 q 10 50 -20 80 t -10 80"/>
+    </g>
+    <path d="M880 275 L 980 262 M1100 225 l -30 -20 m 30 20 l -35 12" fill="none" stroke="#3b7dd8" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <g id="red-pass" data-label="Ánh đỏ đi thẳng" data-say="ánh sáng đỏ">
+    <path d="M790 300 L 1450 420" fill="none" stroke="#e04b3a" stroke-width="7" stroke-linecap="round" stroke-dasharray="1 0"/>
+    <path d="M1420 395 L 1455 421 L 1415 435" fill="none" stroke="#e04b3a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="label" data-label="Tên hiện tượng" data-say="tán xạ Rayleigh">
+    <text x="1080" y="640" font-family="Patrick Hand" font-size="70" fill="#2b2b2b">Tán xạ Rayleigh</text>
+    <path d="M1080 665 C 1250 680, 1420 676, 1560 660" fill="none" stroke="#3b7dd8" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <g id="viewer" data-label="Mắt người nhìn" data-say="mắt ta">
+    <path d="M200 700 q 110 -90 220 0 q -110 90 -220 0 z" fill="#ffffff" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <circle cx="310" cy="700" r="32" fill="#3b7dd8" stroke="#2b2b2b" stroke-width="5"/>
+    <circle cx="310" cy="700" r="12" fill="#2b2b2b"/>
+    <path d="M430 660 q 100 -80 230 -150" fill="none" stroke="#3b7dd8" stroke-width="6" stroke-linecap="round" stroke-dasharray="14 12"/>
+  </g>
+</svg>

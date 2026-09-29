@@ -11,3 +11,8 @@ venv/
 # OS
 Thumbs.db
 .DS_Store
+
+# pipeline caches / outputs
+build/
+out/
+.pytest_cache/

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <!-- Cảnh 1: câu hỏi mở đầu -->
+  <g id="title" data-label="Câu hỏi" data-say="vì sao">
+    <text x="800" y="120" text-anchor="middle" font-family="Patrick Hand" font-size="84" fill="#2b2b2b">Vì sao bầu trời màu xanh?</text>
+    <path d="M430 150 C 640 172, 960 168, 1170 148" fill="none" stroke="#e8743b" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <g id="sun" data-label="Mặt Trời" data-say="mặt trời">
+    <circle cx="300" cy="380" r="95" fill="#f6c453" stroke="#2b2b2b" stroke-width="6"/>
+    <g stroke="#e8743b" stroke-width="7" stroke-linecap="round">
+      <line x1="300" y1="245" x2="300" y2="195"/><line x1="300" y1="515" x2="300" y2="565"/>
+      <line x1="165" y1="380" x2="115" y2="380"/><line x1="435" y1="380" x2="485" y2="380"/>
+      <line x1="205" y1="285" x2="170" y2="250"/><line x1="395" y1="475" x2="430" y2="510"/>
+      <line x1="395" y1="285" x2="430" y2="250"/><line x1="205" y1="475" x2="170" y2="510"/>
+    </g>
+    <path d="M262 370 q 12 -14 24 0 M318 370 q 12 -14 24 0 M270 420 q 30 24 60 0" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <g id="sky" data-label="Bầu trời" data-say="bầu trời">
+    <path d="M620 330 q 20 -60 90 -50 q 30 -55 110 -30 q 70 -20 90 40 q 60 10 40 60 l -320 0 q -40 -10 -10 -20 z" fill="#dfeefe" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M1080 300 q 15 -45 70 -38 q 25 -40 85 -20 q 55 -10 65 35 q 45 10 25 45 l -240 0 q -30 -8 -5 -22 z" fill="#dfeefe" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M560 470 q 250 -60 520 0 q 250 60 480 -10" fill="none" stroke="#3b7dd8" stroke-width="8" stroke-linecap="round" stroke-dasharray="1 0"/>
+  </g>
+  <g id="person" data-label="Người quan sát" data-say="ngước nhìn">
+    <circle cx="1180" cy="620" r="42" fill="none" stroke="#2b2b2b" stroke-width="6"/>
+    <path d="M1166 612 l 0 4 M1194 612 l 0 4 M1168 640 q 12 8 24 0" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>
+    <path d="M1180 662 L1180 780 M1180 700 L1120 650 M1180 700 L1240 730 M1180 780 L1140 860 M1180 780 L1220 860" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>
+    <path d="M1250 560 q 30 -30 20 -70" fill="none" stroke="#3b7dd8" stroke-width="5" stroke-linecap="round"/>
+    <text x="1285" y="540" font-family="Patrick Hand" font-size="64" fill="#e04b3a">?</text>
+  </g>
+</svg>
