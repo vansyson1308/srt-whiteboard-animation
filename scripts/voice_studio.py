@@ -14,6 +14,9 @@ style-aware pauses - the difference between a flat reading and a narrator.
 
 Styles:  natural | news | story | podcast | ads   (see STYLE_PRESETS)
 Manual pauses in the text:  [pause 1s]  [ngắt 500ms]  [nghỉ 2 giây]  <break time="800ms"/>
+Moods (content-aware delivery, see MOODS): read automatically from each sentence, or set
+with a tag at the start of a sentence:  [nhanh] [chậm] [cao trào] [xúc động] [hồi hộp] [vui]
+[bình thường]  (English: [fast] [slow] [climax] [emotional] [suspense] [happy] [neutral]).
 
 Pure and deterministic; no network.  ``python voice_studio.py "text" --style story``
 prints the plan.
@@ -87,6 +90,118 @@ def direction(style: str, lang: str = "vi", extra: str | None = None) -> str:
     hint = (" Speak Vietnamese with native, standard pronunciation and correct tones." if lang == "vi"
             else " Speak English with a natural, neutral accent.")
     return STYLE_DIRECTIONS.get(style, STYLE_DIRECTIONS["natural"]) + hint + (f" {extra}" if extra else "")
+
+
+# ──────────────────────────────────────────────────────────────
+# Moods: content-aware delivery per sentence
+# ──────────────────────────────────────────────────────────────
+# rate %, pitch in semitones, gain dB, extra pause before/after (ms), multiplier on the
+# automatic pause before the sentence, and a dB ramp across the sentence (crescendo > 0)
+MOODS: dict[str, dict] = {
+    "neutral":   {"label": "Bình thường", "rate": 0, "st": 0.0, "gain": 0.0, "before": 0, "after": 0,
+                  "pace": 1.0, "ramp": 0.0, "direction": ""},
+    "fast":      {"label": "Nhanh, lướt", "rate": 11, "st": 0.3, "gain": 0.0, "before": 0, "after": 0,
+                  "pace": 0.7, "ramp": 0.0,
+                  "direction": "Read this part briskly, with light forward momentum."},
+    "slow":      {"label": "Chậm, nhấn mạnh", "rate": -10, "st": -0.4, "gain": 1.0, "before": 180, "after": 420,
+                  "pace": 1.15, "ramp": 0.0,
+                  "direction": "Slow down and stress the key idea: deliberate, weighty, every word clear."},
+    "climax":    {"label": "Cao trào", "rate": 6, "st": 1.8, "gain": 3.0, "before": 320, "after": 520,
+                  "pace": 1.0, "ramp": 2.0,
+                  "direction": "This is the climax: build intensity, raise the energy and pitch, land it hard."},
+    "emotional": {"label": "Xúc động, trầm lắng", "rate": -14, "st": -1.3, "gain": -2.5, "before": 280,
+                  "after": 480, "pace": 1.25, "ramp": -1.5,
+                  "direction": "Emotional and tender: slower, softer and lower, with feeling in the voice."},
+    "suspense":  {"label": "Hồi hộp", "rate": -8, "st": -0.8, "gain": -1.5, "before": 200, "after": 650,
+                  "pace": 1.15, "ramp": 0.0,
+                  "direction": "Suspenseful: hushed and restrained, holding the listener before the reveal."},
+    "happy":     {"label": "Vui, hào hứng", "rate": 7, "st": 1.1, "gain": 1.2, "before": 0, "after": 0,
+                  "pace": 0.9, "ramp": 0.0,
+                  "direction": "Bright and upbeat, smiling voice."},
+}
+MOOD_ALIASES = {
+    "nhanh": "fast", "lướt": "fast", "fast": "fast",
+    "chậm": "slow", "nhấn": "slow", "nhấn mạnh": "slow", "slow": "slow", "emphasis": "slow",
+    "cao trào": "climax", "kịch tính": "climax", "mạnh": "climax", "climax": "climax", "dramatic": "climax",
+    "xúc động": "emotional", "trầm": "emotional", "buồn": "emotional", "trầm lắng": "emotional",
+    "emotional": "emotional", "sad": "emotional",
+    "hồi hộp": "suspense", "bí ẩn": "suspense", "suspense": "suspense",
+    "vui": "happy", "hào hứng": "happy", "happy": "happy", "excited": "happy",
+    "bình thường": "neutral", "thường": "neutral", "neutral": "neutral", "normal": "neutral",
+}
+MOOD_TAG = re.compile(r"\[\s*(" + "|".join(sorted((re.escape(k) for k in MOOD_ALIASES), key=len, reverse=True))
+                      + r")\s*\]", re.IGNORECASE)
+
+
+def mood_name(value: str | None) -> str | None:
+    """'cao trào' / 'Climax' / 'climax' -> 'climax'; None or unknown -> None."""
+    if not value:
+        return None
+    v = unicodedata.normalize("NFC", str(value)).strip().lower()
+    return v if v in MOODS else MOOD_ALIASES.get(v)
+
+
+def _cues(words: str) -> re.Pattern:
+    return re.compile(r"(?<!\w)(?:" + words + r")(?!\w)", re.IGNORECASE)
+
+
+# Cue words for the automatic mood reading (Vietnamese first; a few English ones).
+MOOD_CUES: dict[str, list[tuple[re.Pattern, float]]] = {
+    "emotional": [
+        (_cues("đau khổ|khổ đau|nỗi khổ|khổ sở|đau đớn|nỗi đau|đau lòng|xót xa|day dứt|tuyệt vọng|nước mắt|"
+               "khóc|cô đơn|bi kịch|thương tâm|mất mát|chia ly|chia lìa|qua đời|cái chết|chết chóc|ra đi mãi mãi|"
+               "hy sinh|bệnh tật|già yếu|sinh lão bệnh tử|tang thương|nghèo khổ|khốn khổ|bất hạnh|đáng thương|"
+               "thương xót|yêu thương|mẹ già|người thân|lìa đời|vô thường|trống rỗng|khắc khoải|nghẹn ngào|"
+               "grief|tears|lonely|died|death|suffering|heartbroken"), 1.0),
+        (_cues("buồn|khổ|đau|mất|thương|chết|nỗi"), 0.35),
+    ],
+    "climax": [
+        (_cues("bùng nổ|đỉnh điểm|sụp đổ|kinh hoàng|khủng khiếp|chấn động|choáng váng|khổng lồ|hàng nghìn tỷ|"
+               "hàng tỷ|hàng triệu|nghìn tỷ|siêu lạm phát|phá sản|tan hoang|không thể tin|không tưởng|"
+               "vĩ đại nhất|lớn nhất|cao nhất|mạnh nhất|kỷ lục|mất kiểm soát|chưa từng có|thay đổi mãi mãi|"
+               "cuối cùng thì|bước ngoặt|explode|collapse|record|incredible"), 1.0),
+        (_cues("nhất|tăng vọt|lao dốc|vỡ òa|mãnh liệt|gấp đôi|gấp ba|gấp mười|gấp \d+"), 0.45),
+    ],
+    "suspense": [
+        (_cues("nhưng rồi|thế nhưng|bỗng nhiên|bỗng|đột nhiên|bất ngờ|bí ẩn|bí mật|chuyện gì|điều gì|"
+               "liệu có|liệu rằng|không ai ngờ|không ai biết|lặng lẽ|âm thầm|ngay lúc đó|suddenly|mystery|"
+               "secret|what happened"), 0.9),
+        (_cues("nhưng|liệu"), 0.3),
+    ],
+    "slow": [
+        (_cues("quan trọng nhất|quan trọng|cốt lõi|bản chất|chìa khóa|chìa khoá|mấu chốt|tóm lại|nói cách khác|"
+               "nghĩa là|hãy nhớ|điều cần nhớ|bài học|chân lý|thực chất|chính là|nguyên nhân sâu xa|"
+               "the key|in short|remember|the point is"), 0.9),
+    ],
+    "happy": [
+        (_cues("tuyệt vời|hạnh phúc|niềm vui|vui mừng|hân hoan|thú vị|may mắn|thành công|chiến thắng|"
+               "rạng rỡ|tươi sáng|wonderful|happy|joy|amazing"), 0.8),
+    ],
+    "fast": [
+        (_cues("ví dụ như|chẳng hạn|nào là|rồi thì|vân vân|v\.v\.|for example|such as"), 0.7),
+    ],
+}
+
+
+def detect_mood(sentence: str) -> tuple[str, float]:
+    """Best guess of how a sentence should be read, from its words and punctuation.
+    Returns (mood, strength 0..1); ("neutral", 0) when nothing stands out."""
+    s = unicodedata.normalize("NFC", sentence)
+    score = {m: sum(w * len(rx.findall(s)) for rx, w in cues) for m, cues in MOOD_CUES.items()}
+    core = re.sub(r"[\"'”’)\]»\s]+$", "", s)
+    if core.endswith(("!", "！")):
+        score["climax"] += 0.6
+    if core.endswith(("…", "...")):
+        score["suspense"] += 0.6
+    if core.endswith(("?", "？")):
+        score["suspense"] += 0.15
+    if s.count(",") >= 3 and len(s.split()) / (s.count(",") + 1) <= 5:     # a quick list of short items
+        score["fast"] += 0.8
+    mood = max(score, key=lambda m: score[m])
+    val = score[mood]
+    if val < 0.6:
+        return "neutral", 0.0
+    return mood, float(min(1.0, 0.55 + 0.25 * val))
 
 
 # ──────────────────────────────────────────────────────────────
@@ -175,8 +290,20 @@ def _tag_ms(m: re.Match) -> int:
 
 
 def strip_pause_tags(text: str) -> str:
-    """The text a viewer should see: pause tags removed, whitespace collapsed."""
-    return re.sub(r"\s+", " ", PAUSE_TAG.sub(" ", text)).strip()
+    """The text a viewer should see: pause and mood tags removed, whitespace collapsed."""
+    return re.sub(r"\s+", " ", MOOD_TAG.sub(" ", PAUSE_TAG.sub(" ", text))).strip()
+
+
+def _take_moods(text: str) -> tuple[str, list[tuple[int, str]]]:
+    """Remove mood tags; return the clean text and (position in it, mood) marks."""
+    out, marks, last = "", [], 0
+    for m in MOOD_TAG.finditer(text):
+        out += text[last:m.start()]
+        marks.append((len(out), mood_name(m.group(1))))
+        last = m.end()
+        if (not out or out[-1].isspace()) and text[last:last + 1].isspace():
+            last += 1                                        # "a [tag] b" -> "a b"
+    return out + text[last:], marks
 
 
 ABBREVIATIONS = {
@@ -287,6 +414,7 @@ class Unit:
     first: bool = False
     last: bool = False
     ms: int = 0
+    mood: str | None = None        # from a [mood] tag in the script
 
 
 def segment_script(text: str) -> list[Unit]:
@@ -323,16 +451,25 @@ def segment_script(text: str) -> list[Unit]:
             if kind == "pause":
                 units.append(Unit("pause", ms=int(val)))  # type: ignore[arg-type]
                 continue
-            chunk = str(val).strip()
+            chunk, marks = _take_moods(str(val))
+            lead = len(chunk) - len(chunk.lstrip())
+            chunk = chunk.strip()
+            marks = [(max(0, pos - lead), m) for pos, m in marks]
             if not chunk:
                 continue
+            cursor = 0
             for si, sentence in enumerate(split_sentences(chunk)):
+                prev = cursor
+                a = chunk.find(sentence, cursor)
+                cursor = (cursor if a < 0 else a) + len(sentence)
+                # a tag belongs to the sentence it opens or sits in
+                tagged = [m for pos, m in marks if prev <= pos < cursor]
                 parts = split_long_sentence(sentence)
                 for pi, part in enumerate(parts):
                     u = Unit("speech", part,
                              "heading" if heading else _classify(sentence if pi == len(parts) - 1 else part),
                              "clause" if pi > 0 else ("sentence" if si > 0 or line_units else pending),
-                             paragraph)
+                             paragraph, mood=tagged[-1] if tagged else None)
                     if not units or (all(x.kind == "pause" for x in units) and u.boundary != "clause"):
                         u.boundary = "start"
                     units.append(u)
@@ -486,6 +623,12 @@ class Segment:
     rate: int
     pitch: int
     pause_before_ms: int
+    mood: str = "neutral"
+    intensity: float = 0.0          # 0..1 (x expressiveness) - how strongly the mood is played
+    mood_rate: float = 0.0          # the mood's own share of rate (%), pitch (semitones), gain (dB)
+    mood_st: float = 0.0
+    gain_db: float = 0.0
+    ramp_db: float = 0.0            # loudness change across the sentence (crescendo > 0)
 
 
 @dataclass
@@ -530,10 +673,19 @@ def prepare_spoken(display: str, lang: str, lexicon: list[tuple[str, str]], phra
     return insert_phrase_breaks(t, lang) if phrasing else t
 
 
+HZ_PER_SEMITONE = 8.0      # Edge prosody pitch is in Hz; ~8 Hz = one semitone for a narrator
+
+
 def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch: str | float = 0,
                 pause_scale: float = 1.0, phrasing: bool = True, lexicon: dict | list | None = None,
-                lang: str | None = None, builtin_lexicon: bool = True) -> Plan:
+                lang: str | None = None, builtin_lexicon: bool = True, mood: str | None = None,
+                expressiveness: float = 1.0, auto_mood: bool = True) -> Plan:
+    """``mood`` is the default delivery of the whole text (a scene's "mood"); ``[mood]``
+    tags in the text win for their sentence; otherwise, with ``auto_mood``, each sentence's
+    mood is read from its words.  ``expressiveness`` scales every mood effect (0 = flat)."""
     preset = STYLE_PRESETS.get(style) or STYLE_PRESETS["natural"]
+    expressiveness = max(0.0, min(2.0, float(expressiveness)))
+    default_mood = mood_name(mood)
     style = style if style in STYLE_PRESETS else "natural"
     lang = lang or detect_lang(text)
     pause_scale = max(0.3, min(3.0, float(pause_scale)))
@@ -541,7 +693,10 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
     lex = lexicon_entries(lexicon, lang, builtin_lexicon)
     plan = Plan(style, lang)
     manual, saw_tag, prev_type = 0, False, None
-    for u in segment_script(text):
+    prev_after, prev_mood = 0.0, ("neutral", 0.0)
+    units = segment_script(text)
+    speech = [x for x in units if x.kind == "speech"]
+    for u in units:
         if u.kind == "pause":
             manual += u.ms
             saw_tag = True
@@ -557,6 +712,26 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
             elif prev_type == "question" and u.boundary != "clause":
                 auto = max(auto, preset["pauses"]["afterQuestion"])
             auto *= pause_scale
+        # how this sentence should feel: tag > scene mood > automatic reading
+        if u.mood:
+            md, inten = u.mood, 1.0
+        elif default_mood:
+            md, inten = default_mood, 1.0
+        elif auto_mood and u.type != "heading":
+            md, inten = detect_mood(u.text)
+            if md == "neutral" and prev_mood[0] in ("emotional", "suspense"):
+                md, inten = prev_mood[0], 0.5 * prev_mood[1]       # a feeling lingers a little
+            elif (md == "neutral" and len(speech) >= 2 and u is speech[-1] and u.type == "statement"
+                  and len(u.text.split()) <= 9):
+                md, inten = "slow", 0.6                             # a short closing line lands slowly
+        else:
+            md, inten = "neutral", 0.0
+        k = inten * expressiveness
+        mp = MOODS[md]
+        if auto > 0:
+            auto *= 1.0 + (mp["pace"] - 1.0) * k
+        if plan.segments:
+            auto += max(mp["before"] * k, prev_after) * pause_scale   # one breath, not two
         r, p = preset["rate"] + user_rate, preset["pitch"] + user_pitch
         tweaks = []
         if u.type in ("heading", "question", "exclamation"):
@@ -568,12 +743,17 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
         for dr, dp in tweaks:
             r += dr
             p += dp
+        r += mp["rate"] * k
+        p += mp["st"] * k * HZ_PER_SEMITONE
         has_prev = bool(plan.segments)
         plan.segments.append(Segment(
             len(plan.segments), u.text, spoken, u.type, u.paragraph, u.boundary, saw_tag and has_prev,
             int(max(-50, min(100, round(r)))), int(max(-50, min(50, round(p)))),
-            int(round((manual if saw_tag else auto) if has_prev else manual))))
+            int(round((manual if saw_tag else auto) if has_prev else manual)),
+            md, round(inten, 3), round(mp["rate"] * k, 2), round(mp["st"] * k, 3),
+            round(mp["gain"] * k, 2), round(mp["ramp"] * k, 2)))
         manual, saw_tag, prev_type = 0, False, u.type
+        prev_after, prev_mood = mp["after"] * k, (md, inten)
     plan.trailing_pause_ms = manual
     return plan
 
@@ -585,16 +765,20 @@ def main(argv=None) -> int:
     p.add_argument("--rate", default="+0%")
     p.add_argument("--pitch", default="+0Hz")
     p.add_argument("--pause-scale", type=float, default=1.0)
+    p.add_argument("--mood", default=None, help="default mood: " + ", ".join(MOODS))
+    p.add_argument("--expressiveness", type=float, default=1.0, help="0 = flat ... 1 = default ... 2 = strong")
     p.add_argument("--catalogue", action="store_true", help="print the voice catalogue instead")
     a = p.parse_args(argv)
     if a.catalogue:
         print(json.dumps(CATALOGUE, ensure_ascii=False, indent=2))
         return 0
     text = open(a.text[1:], encoding="utf-8").read() if a.text.startswith("@") else a.text
-    plan = plan_script(text, a.style, a.rate, a.pitch, a.pause_scale)
+    plan = plan_script(text, a.style, a.rate, a.pitch, a.pause_scale, mood=a.mood,
+                       expressiveness=a.expressiveness)
     for s in plan.segments:
+        feel = f"{s.mood}" + (f"·{s.intensity:.1f}" if s.mood != "neutral" else "")
         print(f"[{s.pause_before_ms:>5} ms] {format_rate(s.rate):>5} {format_pitch(s.pitch):>6} "
-              f"{s.type:<11} {s.spoken}")
+              f"{s.type:<11} {feel:<14} {s.spoken}")
     return 0
 
 

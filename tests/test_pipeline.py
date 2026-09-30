@@ -276,3 +276,40 @@ def test_share_video_parts_rebuild_original(tmp_path):
     assert [p["path"] for p in m["parts"]] == [f"parts/part-{i:02d}.mp4" for i in (1, 2, 3)]
     rebuilt = b"".join((out / p["path"]).read_bytes() for p in m["parts"])
     assert rebuilt == data and all(p["size"] <= 1024 * 1024 for p in m["parts"])
+
+
+def test_hand_leaves_during_pauses_and_fillers_use_them(tmp_path):
+    import cv2
+    from render_stream_whiteboard import load_label_map
+    svg = tmp_path / "s.svg"
+    svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">'
+                   '<g id="a"><path d="M80 270 L260 270" stroke="#222" stroke-width="6" fill="none"/></g>'
+                   '<g id="b"><path d="M700 270 L880 270" stroke="#222" stroke-width="6" fill="none"/></g>'
+                   '<g id="star" data-filler="1"><circle cx="480" cy="120" r="40" fill="none" stroke="#c33" '
+                   'stroke-width="5"/></g></svg>')
+    _, annp = svg_scene.build(svg, tmp_path, width=960)
+    ann = json.loads(annp.read_text(encoding="utf-8"))
+    assert [e.get("filler", False) for e in ann["elements"]] == [False, False, True]
+    words = [W("vẽ", 0, 300), W("đường", 300, 600), W("thứ", 5200, 5500), W("hai.", 5500, 5900)]
+    ann["elements"][0]["say"], ann["elements"][1]["say"] = "vẽ đường", "thứ hai"
+    total = timing.schedule(ann["elements"], words, 5900)
+    assert ann["elements"][2]["reveal"]["startMs"] >= 5900     # left for the renderer to place
+    img = cv2.imread(str(tmp_path / "s.png"))
+    fps = 10
+    r = SceneRenderer(img, ann, RenderOptions(width=960, height=540, fps=fps, camera="none", verbose=False),
+                      label_map=load_label_map(ann, tmp_path))
+    hands, emit = [], r._emit
+    r._emit = lambda sink, xy, *a, **k: (hands.append(xy), emit(sink, xy, *a, **k))
+    sink = _ListSink()
+    assert r.render(sink, total) == len(sink.frames) == round(total * fps / 1000)
+    paper = r.paper.astype(int)
+    blank = lambda f, el: np.abs(f[r.labels[:540, :960] == el["maskIndex"]].astype(int) - paper).max() <= 2  # noqa: E501,E731
+    b, star = ann["elements"][1], ann["elements"][2]
+    b_start = int(b["reveal"]["startMs"] * fps / 1000)
+    # line "a" takes well under a second, then the hand steps away until "b" is due
+    off = [i for i in range(12, b_start - 5) if hands[i] is None]
+    assert len(off) >= 10
+    assert all(blank(f, b) for f in sink.frames[:b_start])                # invariant: b not before its turn
+    first_star = next(i for i, f in enumerate(sink.frames) if not blank(f, star))
+    assert 5 < first_star < b_start and not blank(sink.frames[b_start - 1], star)  # doodled in the pause
+    assert np.abs(sink.frames[-1].astype(int) - r.color[:540, :960].astype(int)).mean() < 1.0

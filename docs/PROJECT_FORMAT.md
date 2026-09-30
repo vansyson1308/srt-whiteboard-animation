@@ -17,6 +17,9 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
     "pauseScale": 1.0,                       // nhân độ dài khoảng lặng tự động (0.3–3)
     "chunk": null,                           // "sentence" | "paragraph": mỗi request một câu hay cả đoạn (mặc định theo engine)
     "fx": "broadcast",                       // xử lý giọng kiểu phát thanh (lọc ù, rõ tiếng, nén nhẹ); "none" để tắt
+    "mood": null,                            // cảm xúc mặc định: fast | slow | climax | emotional | suspense | happy | neutral
+    "expressiveness": 1.0,                   // độ đậm của điều tiết cảm xúc: 0 = đọc phẳng … 1 = mặc định … 2 = rất đậm
+    "autoMood": true,                        // tự đọc cảm xúc từng câu từ nội dung (tag [cao trào]… luôn thắng)
     "lexicon": {"GPT": "gi pi ti"},          // cách đọc từ viết tắt / tên riêng
     "instructions": null,                    // gemini/openai: tự mô tả giọng điệu (thay cho style)
     "reference": null, "referenceText": null, "confirmAuthorizedVoice": false   // fish: clone giọng có sự đồng ý
@@ -32,7 +35,10 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
   "render": { "inkPath": "skeleton", "colorFill": "contour-wipe", "camera": "follow",
               "cameraMaxZoom": 1.2, "paper": "#F6F1E3", "hand": null, "handHeightRatio": 0.42,
               "humanMotion": true,                  // nhịp tay người: chậm ở góc/cuối nét, dừng khi đặt/nhấc bút
-              "penLift": 14 },                      // px (ở 1080p) bàn tay nhấc lên khi di chuyển giữa các nét
+              "penLift": 14,                        // px (ở 1080p) bàn tay nhấc lên khi di chuyển giữa các nét
+              "idleHand": "exit",                   // exit: vẽ đúng tốc độ tự nhiên rồi rút tay ra khỏi khung khi chờ
+                                                    //   (data-filler lấp khoảng nghỉ) | stretch: kéo dài nét cho kín thời gian
+              "drawSpeed": 1100 },                  // tốc độ bút tự nhiên, px/giây ở 1080p
   "sync":   { "leadMs": 250, "voiceDelayMs": 200, "minDrawMs": 900, "maxDrawMs": 4500, "tailMs": 800 },
   "transition": { "type": "fade", "ms": 350 },      // fade | slide | cut
   "audio_master": { "lufs": -14 },
@@ -63,8 +69,8 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
 | `svg` | Cảnh do agent vẽ – xem [SVG_GUIDE.md](SVG_GUIDE.md). Tốt nhất. |
 | `image` + `annotation` | Ảnh raster + annotation (tạo tay / preview.html). |
 | `image` + `auto` | Tự chia vùng bằng `auto_annotate.py`. |
-| `narration` | Lời thoại của cảnh (chế độ TTS). Có thể chèn `[pause 800ms]`, `[ngắt 1s]` – không hiện trong phụ đề. |
-| `voice` | Ghi đè giọng cho riêng cảnh này, ví dụ `{"style": "ads"}` hoặc `{"engine": "tiktok"}`. |
+| `narration` | Lời thoại của cảnh (chế độ TTS). Có thể chèn `[pause 800ms]`, `[ngắt 1s]` và tag cảm xúc `[cao trào]`, `[xúc động]`… (xem dưới) – không hiện trong phụ đề. |
+| `voice` | Ghi đè giọng cho riêng cảnh này, ví dụ `{"style": "ads"}`, `{"mood": "emotional"}` hoặc `{"engine": "tiktok"}`. |
 | `say` | Danh sách cụm từ kích hoạt, gán lần lượt cho các phần tử chưa có `say`. |
 | `cues` | `[đầu, cuối]` (đánh số từ 1) – các câu SRT thuộc cảnh này (chế độ `audio`). |
 | `keepTiming` | `true` = giữ nguyên thời gian trong annotation, không đồng bộ theo giọng. |
@@ -86,3 +92,23 @@ Mỗi cảnh có đúng `round(ms × fps / 1000)` khung hình và đúng `khung 
 - `<name>-<format>-qa.jpg` – contact sheet 12 khung để kiểm tra
 - `<name>.srt` – phụ đề (upload kèm lên YouTube)
 - `<name>-report.json` – thời lượng từng cảnh, loudness, đường dẫn
+
+## Điều tiết giọng theo nội dung (mood)
+
+Mỗi câu được đọc với một "mood" quyết định tốc độ, cao độ, độ to, hướng to/nhỏ dần trong câu và khoảng nghỉ trước/sau câu:
+
+| Tag trong lời thoại | Mood | Cách đọc |
+|---|---|---|
+| `[nhanh]` | fast | nhanh hơn ~11%, nghỉ ngắn – liệt kê, dẫn dắt |
+| `[chậm]`, `[nhấn]` | slow | chậm ~10%, to hơn chút, nghỉ sau dài – ý cốt lõi, kết luận |
+| `[cao trào]` | climax | nhanh nhẹ, cao hơn ~1.8 cung, to hơn 3 dB và to dần, nghỉ trước để "lấy đà" |
+| `[xúc động]`, `[trầm]`, `[buồn]` | emotional | chậm ~14%, trầm ~1.3 cung, nhỏ hơn và nhỏ dần, nghỉ dài |
+| `[hồi hộp]` | suspense | chậm, nhỏ, trầm, nghỉ dài sau câu – trước khi "lật bài" |
+| `[vui]`, `[hào hứng]` | happy | nhanh nhẹ, sáng, to hơn |
+| `[bình thường]` | neutral | tắt điều tiết cho câu đó |
+
+- Tag đặt ở đầu câu (hoặc trong câu) và chỉ áp cho **câu đó**. Muốn cả cảnh: `"voice": {"mood": "emotional"}`.
+- Không có tag thì câu được **tự đọc cảm xúc** từ từ ngữ và dấu câu (`!` → cao trào, `…` → hồi hộp, "đau khổ", "nước mắt" → xúc động, "bản chất", "tóm lại" → nhấn; câu kết ngắn của cảnh → chậm lại). Cảm xúc buồn/hồi hộp còn "vương" nhẹ sang câu kế tiếp.
+- Agent viết kịch bản nên tự đặt tag cho các câu then chốt (hook, cú lật, cao trào, đoạn xúc động, câu chốt): hiểu nội dung tốt hơn luật từ khoá.
+- Xem trước cách đọc (không cần mạng): `$PY scripts/voice_studio.py "Lời thoại…" --style podcast`.
+- Edge đọc bằng SSML prosody; VieNeu, TikTok, MakeVoice, Fish được chỉnh tốc độ/cao độ bằng xử lý âm thanh (WSOLA, giữ nguyên chất giọng); Gemini/OpenAI nhận thêm lời chỉ dẫn giọng cho từng câu. ElevenLabs (đọc một lượt) chưa áp dụng.

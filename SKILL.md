@@ -36,6 +36,7 @@ Tạo `projects/<slug>/video.json` + `scenes/`. (Mẫu hoàn chỉnh: `examples/
 - Câu ngắn, văn nói tự nhiên, số viết dạng chữ số được (TTS đọc đúng). Tránh ký hiệu lạ, viết tắt.
 - Viết `narration` cho từng cảnh vào `video.json`.
 - **Chọn giọng + phong cách đọc** (mục "Giọng đọc" bên dưới): TikTok/kiến thức → `"style": "podcast"`; kể chuyện/cảm xúc → `"story"`; tin tức → `"news"`; kêu gọi hành động → `"ads"`. Có thể đặt riêng cho từng cảnh bằng `"voice": {"style": "story"}` trong cảnh. Muốn ngắt nghỉ có chủ ý (trước câu chốt) → chèn `[pause 600ms]` vào `narration`; thẻ này không hiện trong phụ đề.
+- **Đạo diễn cảm xúc từng câu** (quan trọng để giọng truyền cảm): đặt tag ở đầu các câu then chốt – `[hồi hộp]` cho hook/câu dẫn tò mò, `[cao trào]` cho con số sốc/cú lật, `[xúc động]` cho đoạn buồn/sâu lắng, `[chậm]` cho định nghĩa/ý cốt lõi/câu chốt, `[nhanh]` cho đoạn liệt kê/dẫn dắt, `[vui]` cho kêu gọi tích cực. Mỗi cảnh chỉ 1–3 tag, để phần còn lại tự nhiên (không tag thì hệ thống tự đọc cảm xúc từ từ ngữ). Cả cảnh một màu cảm xúc → `"voice": {"mood": "emotional"}`. Kiểm tra: `$PY scripts/voice_studio.py "narration…" --style podcast` in ra mood, tốc độ, khoảng nghỉ từng câu.
 
 ### 3. Vẽ từng cảnh bằng SVG
 Đọc **docs/SVG_GUIDE.md** trước khi vẽ. Tóm tắt:
@@ -44,6 +45,7 @@ Tạo `projects/<slug>/video.json` + `scenes/`. (Mẫu hoàn chỉnh: `examples/
 - `data-say` phải **xuất hiện nguyên văn** trong `narration` của cảnh đó.
 - Nét `#2b2b2b` dày 5–8, bo tròn; nhấn cam/đỏ/xanh; font `Patrick Hand`; nhiều khoảng trắng; chữ trong cảnh chỉ là nhãn ngắn.
 - Phần tử đầu tiên nên là thứ "hút mắt" nhất (câu hỏi, con số, hình lạ).
+- Bàn tay vẽ với tốc độ tự nhiên rồi rút khỏi khung trong lúc chờ phần tử sau. Nếu một cảnh có quãng nói dài (> 3 giây) mà không có gì mới để vẽ, thêm phần tử có `data-say` cho quãng đó, hoặc 1–2 hình trang trí `data-filler="1"` (bóng đèn, ngôi sao, gạch chân phụ…) – renderer tự vẽ chúng vào khoảng nghỉ.
 
 Kiểm tra từng cảnh (nhìn ảnh bằng công cụ đọc ảnh của bạn):
 ```bash
@@ -115,6 +117,8 @@ Schema đầy đủ: **docs/PROJECT_FORMAT.md**.
 | `openai` | `alloy`, `nova`, … | `OPENAI_API_KEY` | `style` thành `instructions`; `OPENAI_BASE_URL` trỏ tới server tương thích (vd. `vieneu serve`) |
 | `fish` | model id trên fish.audio, hoặc clone từ `"reference"` + `"referenceText"` | `FISH_API_KEY`, `pip install fish-audio-sdk` | **chỉ clone giọng khi chính chủ đồng ý**: `"confirmAuthorizedVoice": true`; không commit file giọng mẫu |
 | `tiktok` / `makevoice` | `BV074_streaming`, `BV075_streaming` / ID ElevenLabs | không | qua dịch vụ trung gian không chính thức, điều khoản thương mại không rõ → **chỉ dùng làm nháp**, không dùng cho kênh kiếm tiền |
+
+**Điều tiết theo nội dung (mood)**: mỗi câu có mood riêng (tag `[cao trào]`, `[xúc động]`, `[hồi hộp]`, `[chậm]`, `[nhanh]`, `[vui]`, hoặc tự đọc từ nội dung) quyết định tốc độ, cao độ, độ to, to/nhỏ dần và khoảng nghỉ quanh câu. `"expressiveness"` (0–2, mặc định 1) chỉnh độ đậm; `"autoMood": false` chỉ nghe theo tag. Bảng đầy đủ: docs/PROJECT_FORMAT.md.
 
 Xem cách một đoạn sẽ được đọc (không cần mạng): `$PY scripts/voice_studio.py "Lời thoại…" --style story`. Danh sách giọng: `$PY scripts/voice_studio.py x --catalogue`.
 Engine không có timestamp (vieneu/gemini/tiktok/makevoice/openai/fish) được căn thời gian bằng khoảng lặng trong audio khớp với dấu câu, nên `data-say` vẫn đồng bộ tốt (sai số ~0.1s); câu ngắn, dấu câu rõ ràng giúp đồng bộ chính xác hơn.

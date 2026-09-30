@@ -109,7 +109,8 @@ DEFAULTS = {
               "fx": "broadcast"},
     "captions": {"enabled": True, "karaoke": True, "maxWords": 6, "uppercase": False, "box": False},
     "render": {"inkPath": "skeleton", "colorFill": "contour-wipe", "camera": "follow", "cameraMaxZoom": 1.2,
-               "paper": "#F6F1E3", "hand": None, "handHeightRatio": 0.42, "humanMotion": True, "penLift": 14},
+               "paper": "#F6F1E3", "hand": None, "handHeightRatio": 0.42, "humanMotion": True, "penLift": 14,
+               "idleHand": "exit", "drawSpeed": 1100},
     "sync": {"leadMs": 250, "voiceDelayMs": 200, "minDrawMs": 900, "maxDrawMs": 4500, "tailMs": 800},
     "transition": {"type": "fade", "ms": 350},
     "audio_master": {"lufs": -14.0},
@@ -192,7 +193,8 @@ class SceneVoice:
 
 
 VOICE_KEYS = ("voice", "style", "rate", "pitch", "pauseScale", "phrasing", "lexicon", "instructions",
-              "language", "reference", "referenceText", "confirmAuthorizedVoice", "chunk")
+              "language", "reference", "referenceText", "confirmAuthorizedVoice", "chunk",
+              "mood", "expressiveness", "autoMood")
 
 
 _WARNED: dict = {}
@@ -227,7 +229,7 @@ def tts_scene(scene: dict, voice: dict, bdir: Path, delay_ms: int, engine_overri
     if engine != voice.get("engine"):
         cfg["voice"] = None                           # --engine override: that engine's default voice
     ref = Path(cfg["reference"]) if cfg.get("reference") else None
-    key = sha(engine, cfg, text, ref.read_bytes() if ref and ref.exists() else b"")[:16]
+    key = sha(engine, cfg, text, ref.read_bytes() if ref and ref.exists() else b"", tts.PROSODY_VERSION)[:16]
     vdir = bdir / "voice"
     vdir.mkdir(parents=True, exist_ok=True)
     meta = vdir / f"{scene['id']}-{key}.json"
@@ -246,7 +248,11 @@ def tts_scene(scene: dict, voice: dict, bdir: Path, delay_ms: int, engine_overri
                              style=style, pause_scale=float(cfg.get("pauseScale") or 1.0),
                              lexicon=cfg.get("lexicon"), phrasing=cfg.get("phrasing", True) is not False,
                              reference=cfg.get("reference"), reference_text=cfg.get("referenceText"),
-                             consent=cfg.get("confirmAuthorizedVoice") is True, chunk=cfg.get("chunk"))
+                             consent=cfg.get("confirmAuthorizedVoice") is True, chunk=cfg.get("chunk"),
+                             mood=cfg.get("mood"),
+                             expressiveness=float(cfg["expressiveness"]) if cfg.get("expressiveness")
+                             is not None else 1.0,
+                             auto_mood=cfg.get("autoMood", True) is not False)
         meta.write_text(json.dumps(res.to_json(), ensure_ascii=False), encoding="utf-8")
     audio = wv.polish_voice(wv.load_audio(res.audio), voice.get("fx", "broadcast"))
     audio = np.concatenate([wv.silence(delay_ms), audio])
@@ -298,6 +304,7 @@ def external_audio_voices(proj: dict, pdir: Path) -> list[SceneVoice]:
 
 def fit_elements(elements: list[dict], limit_ms: int) -> None:
     """Compress a schedule so everything finishes before ``limit_ms``."""
+    elements = [e for e in elements if not e.get("filler")]    # fillers are placed by the renderer
     if not elements:
         return
     last = max(e["reveal"]["startMs"] + e["reveal"]["durationMs"] for e in elements)
@@ -633,6 +640,7 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
                     camera=rcfg["camera"], camera_max_zoom=float(rcfg["cameraMaxZoom"]),
                     paper_hex=rcfg["paper"], hand_height_ratio=float(rcfg["handHeightRatio"]),
                     human_motion=bool(rcfg["humanMotion"]), pen_lift=float(rcfg["penLift"]),
+                    idle_hand=str(rcfg["idleHand"]), draw_speed=float(rcfg["drawSpeed"]),
                     crf=24 if draft else 14, preset="ultrafast" if draft else "veryfast", verbose=False)
         if rcfg.get("hand"):
             opts["hand"] = str((pdir / rcfg["hand"]).resolve())

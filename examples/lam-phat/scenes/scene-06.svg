@@ -3,6 +3,12 @@
   <g id="what" data-label="Làm gì?" data-say="nên làm gì">
     <text x="540" y="210" text-anchor="middle" font-family="Patrick Hand" font-size="110" fill="#2b2b2b">Làm gì bây giờ?</text>
   </g>
+  <!-- data-filler: không gắn với lời thoại, tay vẽ nó trong khoảng nghỉ thay vì đứng chờ -->
+  <g id="idea" data-label="Bóng đèn ý tưởng" data-filler="1">
+    <path d="M960 372 C 925 350 922 300 948 282 C 972 266 1008 270 1022 296 C 1036 324 1024 352 1002 372 L 998 392 L 964 392 Z" fill="#fff4b8" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M966 408 L 996 408 M970 424 L 992 424" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>
+    <path d="M982 250 L 982 228 M1040 276 L 1056 262 M924 276 L 908 262" fill="none" stroke="#e8743b" stroke-width="6" stroke-linecap="round"/>
+  </g>
   <g id="cart" data-label="Mua được bao nhiêu" data-say="mua được bao nhiêu">
     <path d="M110 320 L 160 320 L 200 470 L 350 470 L 380 370 L 175 370" fill="none" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="215" cy="510" r="18" fill="#ffffff" stroke="#2b2b2b" stroke-width="6"/>

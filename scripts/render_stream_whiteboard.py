@@ -23,7 +23,7 @@ The last stdout line is ``OUTPUT=<path>``.
 Usage:
   python render_stream_whiteboard.py <image> <annotation.json> <out.mp4> [hand.png]
       [--size 1920x1080] [--fps 30] [--ink-path skeleton|grid]
-      [--color-fill contour-wipe|brush|fade|none] [--camera none|follow]
+      [--color-fill contour-wipe|brush|fade|none] [--camera none|follow] [--idle-hand exit|stretch]
       [--total-ms N] [--bare-tip] [--draft]
 """
 from __future__ import annotations
@@ -47,6 +47,7 @@ from wb_video import VideoSink  # noqa: E402
 
 ASSETS_DIR = _SCRIPT_DIR.parent / "assets"
 DEFAULT_HAND = ASSETS_DIR / "drawing-hand-clean.png"
+MAX_LAG_S = 0.8     # idle_hand="exit": how late an element may start so the one before isn't rushed
 if not DEFAULT_HAND.exists():  # pragma: no cover - older checkouts
     DEFAULT_HAND = ASSETS_DIR / "drawing-hand.png"
 
@@ -81,6 +82,10 @@ class RenderOptions:
     travel_speed: float = 3.5           # pen-up travel speed relative to drawing speed
     human_motion: bool = True           # human pen timing: slow corners/stroke ends, dwell at pen-down/up
     pen_lift: float = 14.0              # px (at 1080p) the hand rises while travelling between strokes
+    idle_hand: str = "exit"             # exit: draw at a natural pace, then the hand leaves until the next
+                                        #   element (and data-filler doodles use long pauses) | stretch: old
+                                        #   behaviour, every element is stretched over its whole time slot
+    draw_speed: float = 1100.0          # natural pen speed, px/s at 1080p (idle_hand="exit")
     crf: int = 18
     preset: str = "veryfast"
     verbose: bool = True
@@ -198,6 +203,24 @@ def pen_timeline(pts: np.ndarray, draw: np.ndarray, frames: int, human: bool = T
     if not human or n < 3:
         idx = np.round(np.linspace(0, n - 1, frames)).astype(int) if frames > 1 else np.array([n - 1])
         return idx, (~draw[idx]).astype(np.float32)
+    cost, _ = _pen_cost(pts, draw)
+    cum = np.cumsum(cost)
+    total = cum[-1]
+    if total <= 0:
+        idx = np.full(frames, n - 1, int)
+    else:
+        targets = total * (np.arange(1, frames + 1) / frames)
+        idx = np.minimum(np.searchsorted(cum, targets - 1e-9), n - 1)
+        idx[-1] = n - 1
+    up = (~draw[idx]).astype(np.float32)
+    k = 3
+    smooth = np.convolve(np.pad(up, k, mode="edge"), np.ones(2 * k + 1) / (2 * k + 1), mode="valid")
+    return idx.astype(int), smooth.astype(np.float32)
+
+
+def _pen_cost(pts: np.ndarray, draw: np.ndarray) -> tuple[np.ndarray, float]:
+    """Per-sample time cost (in units of one drawing step) of a human hand, and the step in px."""
+    n = len(pts)
     p = pts.astype(np.float32)
     seg = np.diff(p, axis=0)
     seglen = np.maximum(np.hypot(seg[:, 0], seg[:, 1]), 1e-3)
@@ -233,18 +256,20 @@ def pen_timeline(pts: np.ndarray, draw: np.ndarray, frames: int, human: bool = T
         else:
             cost[a:b] *= 1.0 + 1.2 * (1.0 - np.sin(math.pi * t))           # glide: ease in/out
             cost[a] += 2.0                                                 # pen lifts
-    cum = np.cumsum(cost)
-    total = cum[-1]
-    if total <= 0:
-        idx = np.full(frames, n - 1, int)
-    else:
-        targets = total * (np.arange(1, frames + 1) / frames)
-        idx = np.minimum(np.searchsorted(cum, targets - 1e-9), n - 1)
-        idx[-1] = n - 1
-    up = (~draw[idx]).astype(np.float32)
-    k = 3
-    smooth = np.convolve(np.pad(up, k, mode="edge"), np.ones(2 * k + 1) / (2 * k + 1), mode="valid")
-    return idx.astype(int), smooth.astype(np.float32)
+    return cost, step
+
+
+def natural_ink_seconds(pts: np.ndarray, draw: np.ndarray, speed_px_s: float,
+                        travel_speed: float = 3.5) -> float:
+    """How long a person takes to draw this pen plan: ink at ``speed_px_s`` on average,
+    pen-up moves ``travel_speed`` times faster, plus a short touch-down per stroke.
+    (:func:`pen_timeline` then decides where inside that time the pen slows down.)"""
+    if len(pts) < 2:
+        return 0.0
+    d = np.hypot(*np.diff(pts.astype(np.float64), axis=0).T)
+    ink, travel = float(d[draw[1:]].sum()), float(d[~draw[1:]].sum())
+    strokes = int(np.count_nonzero(draw[1:] & ~draw[:-1])) + int(bool(draw[1]))
+    return (ink + travel / max(1.0, travel_speed)) / max(1e-3, speed_px_s) + 0.05 * strokes
 
 
 # ──────────────────────────────────────────────────────────────
@@ -311,6 +336,7 @@ class SceneRenderer:
         self.ink = self.thresh < 10                               # line pixels
         diff = np.abs(color.astype(np.int16) - self.paper.astype(np.int16)).sum(axis=2)
         self.content = diff > 40                                   # anything not paper
+        self.solid = diff > 60                                     # clearly coloured (no AA fringe)
         if opts.ink_style == "threshold":
             self.ink_paint = np.repeat(self.thresh[:, :, None], 3, axis=2)
             self.ink_reveal = self.ink
@@ -513,7 +539,13 @@ class SceneRenderer:
         return (self.W * 0.78, self.H * 1.08)   # tip below the frame -> hand fully off-screen
 
     def _gap(self, sink, n: int, start_xy, end_xy, cam_target=None) -> None:
-        """Idle frames between elements; the hand glides out and back in."""
+        """Idle frames between elements, the way a person waits at a whiteboard.
+
+        Long pause: the pen lifts, the hand leaves the board and comes back just in
+        time for the next element.  Short pause: the pen lifts and holds still, then
+        travels to the next start at a natural speed - never a slow drift across the
+        board.  ``start_xy``/``end_xy`` None = the hand is (or ends) off-screen.
+        """
         if n <= 0:
             return
         rest = self._hand_rest()
@@ -522,26 +554,40 @@ class SceneRenderer:
                 self._emit(sink, None, cam_target)
             return
         fps = self.opts.fps
-        move = max(1, int(0.35 * fps))
-        if start_xy is None:
-            start_xy = rest
-        if end_xy is None:
-            end_xy = rest
-        if n < 2 * move + int(0.3 * fps):   # short gap: hover directly to the next start
-            for i in range(n):
-                t = _ease((i + 1) / n)
-                self._emit(sink, (start_xy[0] + (end_xy[0] - start_xy[0]) * t,
-                                  start_xy[1] + (end_xy[1] - start_xy[1]) * t), cam_target)
-            return
-        for i in range(n):
-            if i < move:
-                t = _ease((i + 1) / move)
-                xy = (start_xy[0] + (rest[0] - start_xy[0]) * t, start_xy[1] + (rest[1] - start_xy[1]) * t)
-            elif i >= n - move:
-                t = _ease((i - (n - move) + 1) / move)
-                xy = (rest[0] + (end_xy[0] - rest[0]) * t, rest[1] + (end_xy[1] - rest[1]) * t)
-            else:
-                xy = None
+        move = max(1, int(0.4 * fps))                       # leave / come back
+        lift = self.opts.pen_lift * self.opts.scale_ref
+        lerp = lambda p, q, u: (p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u)  # noqa: E731
+
+        def lifted(p, u):                                   # pen raised off the paper by u (0..1)
+            return (p[0] + 0.35 * lift * u, p[1] - lift * u)
+
+        def travel_frames(p, q) -> int:
+            d = math.hypot(q[0] - p[0], q[1] - p[1])
+            return int(np.clip(d / (2600.0 * self.opts.scale_ref) * fps, 0.22 * fps, 0.6 * fps))
+
+        out = []
+        leave = start_xy is None or end_xy is None or n >= 2 * move + int(0.5 * fps)
+        if not leave:
+            k = min(n, travel_frames(start_xy, end_xy))
+            hold = n - k
+            up = min(hold, max(1, int(0.15 * fps)))
+            for i in range(hold):                           # lift, then keep still
+                out.append(lifted(start_xy, _ease((i + 1) / up) if i < up else 1.0))
+            a = lifted(start_xy, 1.0 if hold else 0.0)
+            for i in range(k):                              # travel, pen comes down at the end
+                u = _ease((i + 1) / k)
+                xy = lerp(a, end_xy, u)
+                out.append(lifted(xy, 1.0 - u) if hold else xy)
+        else:
+            go = min(move, n) if start_xy is not None else 0
+            back = min(move, n - go) if end_xy is not None else 0
+            for i in range(go):
+                out.append(lerp(lifted(start_xy, 1.0), rest, _ease((i + 1) / go)))
+            out += [None] * (n - go - back)
+            for i in range(back):
+                u = _ease((i + 1) / back)
+                out.append(lifted(lerp(rest, end_xy, u), 1.0 - u))
+        for xy in out:
             if xy is not None and (xy[0] >= self.W or xy[1] >= self.H):
                 xy = None   # tip outside the frame: the whole hand is off-screen
             self._emit(sink, xy, cam_target)
@@ -571,8 +617,8 @@ class SceneRenderer:
         self._act = 0.0
         return tuple(pts[-1])
 
-    def _color_phase(self, sink, frames: int, allowed: np.ndarray, pts, cam_target):
-        mode = self.opts.color_fill
+    def _color_phase(self, sink, frames: int, allowed: np.ndarray, pts, cam_target, mode: str | None = None):
+        mode = mode or self.opts.color_fill
         if frames <= 0:
             self.drawn[allowed] = self.color[allowed]
             return None
@@ -624,6 +670,10 @@ class SceneRenderer:
             delay = int(np.clip(rh * 0.04, 12, 52))
             ys_ = np.arange(rh, dtype=np.float32)[:, None]
             sweep = rh + 2 * delay
+            # the hand only hatches across the columns that actually receive colour
+            need = a_crop & (np.abs(d_crop.astype(np.int16) - c_crop.astype(np.int16)).sum(axis=2) > 24)
+            cols = np.nonzero(need.any(axis=0))[0]
+            c0, c1 = (int(cols[0]), int(cols[-1])) if cols.size else (0, rw - 1)
             lanes = max(2, int(round(frames / 9)))
             for fi in range(frames):
                 p = 1.0 if frames == 1 else fi / (frames - 1)
@@ -632,9 +682,9 @@ class SceneRenderer:
                 d_crop[rev] = c_crop[rev]
                 lane = _ease((fi * lanes / frames) % 1.0)
                 fwd = int(fi * lanes / frames) % 2 == 0
-                cx = int((lane if fwd else 1 - lane) * (rw - 1))
-                col = np.nonzero(rev[:, cx])[0]
-                cy = int(col[-1]) if col.size else 0
+                cx = c0 + int((lane if fwd else 1 - lane) * (c1 - c0))
+                col = np.nonzero(rev[:, cx] & need[:, cx])[0]
+                cy = int(col[-1]) if col.size else (last_xy[1] - top if last_xy else 0)
                 last_xy = (left + cx, top + cy)
                 self._emit(sink, last_xy, cam_target)
         d_crop[a_crop] = c_crop[a_crop]
@@ -654,6 +704,110 @@ class SceneRenderer:
         src = self.color[y0:y1, x0:x1].astype(np.float32)
         self.drawn[y0:y1, x0:x1] = (tgt * (1 - m) + src * m).astype(np.uint8)
 
+    def colour_pixels(self, allowed: np.ndarray, pts, draw, radius, rmask) -> int:
+        """Pixels of an element the pen strokes do not reveal (fills, shading): the
+        area a colour pass would have to paint.  0 for pure line art and text."""
+        cover = np.zeros(allowed.shape, np.uint8)
+        k = 1
+        while k < len(pts):
+            if not draw[k]:
+                k += 1
+                continue
+            j = k
+            while j < len(pts) and draw[j]:
+                j += 1
+            seg = pts[k - 1:j].reshape(-1, 1, 2).astype(np.int32)
+            cv2.polylines(cover, [seg], False, 255, thickness=int(radius[k]) * 2 + 1, lineType=cv2.LINE_8)
+            k = j
+        todo = allowed & ~(cover.astype(bool) & rmask)
+        return int(np.count_nonzero(todo & self.solid))
+
+    def element_timing(self, el: dict, allowed, pts, draw, radius, rmask) -> tuple[str, float, float]:
+        """(colour mode, natural ink seconds, natural colour seconds) for one element."""
+        o = self.opts
+        s2 = o.scale_ref ** 2
+        mode = el.get("colorFill") or o.color_fill
+        px = self.colour_pixels(allowed, pts, draw, radius, rmask) if mode != "none" else 0
+        if px < max(900 * s2, 0.03 * np.count_nonzero(allowed)):
+            mode = "none"                                    # nothing worth a colour pass
+        ink_s = natural_ink_seconds(pts, draw, o.draw_speed * o.scale_ref, o.travel_speed)
+        col_s = 0.0 if mode == "none" else float(np.clip(0.45 + px / s2 / 120000.0, 0.6, 3.0))
+        return mode, ink_s, col_s
+
+    def _timeline(self, plans: list, total_f: int, to_f) -> list[list[int]]:
+        """[start frame, frames used] per element.
+
+        ``stretch``: every element fills its slot (start .. start + duration).
+        ``exit``: an element takes its natural drawing time; a slot longer than that
+        leaves a pause (the hand steps away), a slot too short may run on for up to
+        ``MAX_LAG_S`` into the next element's start rather than rushing the pen.
+        The scene length never changes."""
+        end_f = total_f - to_f(self.opts.final_fade_ms) - int(0.3 * self.opts.fps)
+        for lag in (MAX_LAG_S, MAX_LAG_S / 2, 0.0):      # less running-on if the scene would overflow
+            out = self._timeline_pass(plans, end_f, to_f, lag)
+            if not out or out[-1][0] + out[-1][1] <= max(end_f, to_f(plans[-1][0]["reveal"]["startMs"])
+                                                          + to_f(plans[-1][0]["reveal"]["durationMs"])):
+                break
+        for tl in out:                                     # hard guarantee: the frame count is a contract
+            tl[0] = min(tl[0], total_f - 2)
+            tl[1] = max(1, min(tl[1], total_f - 1 - tl[0]))
+        return out
+
+    def _timeline_pass(self, plans: list, end_f: int, to_f, lag: float) -> list[list[int]]:
+        fps = self.opts.fps
+        out, f = [], 0
+        for i, pl in enumerate(plans):
+            el = pl[0]
+            anchor = to_f(el["reveal"]["startMs"])
+            slot = max(2, to_f(el["reveal"]["durationMs"]))
+            start = max(f, anchor)
+            if self.opts.idle_hand == "stretch":
+                use = slot
+            else:
+                nat = max(int(0.45 * fps), int(round((pl[7] + pl[8]) * fps)))
+                want = nat if slot < nat else slot if slot <= nat * 1.25 else int(round(nat * 1.1))
+                nxt = to_f(plans[i + 1][0]["reveal"]["startMs"]) if i + 1 < len(plans) else end_f
+                limit = (nxt + int(lag * fps) if i + 1 < len(plans) else end_f) - start - 2
+                use = max(min(want, limit), min(slot, want), 2)
+            out.append([start, use])
+            f = start + use
+        return out
+
+    def _place_fillers(self, plans: list, timeline: list, fplans: list, total_f: int, to_f
+                       ) -> tuple[list, list]:
+        """Put data-filler doodles into the longest pauses of the scene (after an element
+        is finished and before the next one starts); each filler is drawn at most once,
+        in document order.  A filler that fits nowhere is left to the closing
+        cross-fade, so the last frame still shows the complete picture."""
+        fps = self.opts.fps
+        spans = []                                          # [free from, free until, insert after]
+        for i, (s, use) in enumerate(timeline):
+            nxt = timeline[i + 1][0] if i + 1 < len(timeline) else \
+                total_f - to_f(self.opts.final_fade_ms) - int(0.6 * fps)
+            spans.append([s + use + int(0.3 * fps), nxt - int(0.5 * fps), i])
+        placed: dict[int, list] = {}
+        for fp in fplans:
+            el = fp[0] = dict(fp[0])                        # the caller's annotation stays untouched
+            need = max(int(0.6 * fps), int(round((fp[7] + fp[8]) * fps)))
+            for sp in spans:
+                if sp[1] - sp[0] >= need:
+                    el["reveal"] = dict(el.get("reveal", {}), startMs=int(sp[0] * 1000 / fps),
+                                        durationMs=int(need * 1000 / fps))
+                    placed.setdefault(sp[2], []).append((fp, [sp[0], need]))
+                    sp[0] += need + int(0.3 * fps)
+                    break
+            else:
+                if self.opts.verbose:
+                    print(f"  [filler] no pause long enough for '{el.get('label') or el.get('id')}'")
+        out_p, out_t = [], []
+        for i, (pl, tl) in enumerate(zip(plans, timeline)):
+            out_p.append(pl)
+            out_t.append(tl)
+            for fp, ftl in placed.get(i, []):
+                out_p.append(fp)
+                out_t.append(ftl)
+        return out_p, out_t
+
     # ── main loop ──
     def render(self, sink, total_ms: int | None = None) -> int:
         o = self.opts
@@ -666,7 +820,8 @@ class SceneRenderer:
                 max((e["reveal"]["startMs"] + e["reveal"]["durationMs"] for e in els), default=0) + 1000)
         total_f = max(1, to_f(total_ms))
         # the frame count is a contract (voice sync): if the schedule does not fit, compress it
-        last_end = max((e["reveal"]["startMs"] + e["reveal"]["durationMs"] for e in els), default=0)
+        last_end = max((e["reveal"]["startMs"] + e["reveal"]["durationMs"] for e in els
+                        if not e.get("filler")), default=0)
         budget = max(200, total_ms - 300)
         if last_end > budget:
             k = budget / last_end
@@ -677,40 +832,56 @@ class SceneRenderer:
                 e["reveal"]["startMs"] = int(e["reveal"]["startMs"] * k)
                 e["reveal"]["durationMs"] = max(200, int(e["reveal"]["durationMs"] * k))
         wsum = o.ink_weight + (0 if o.color_fill == "none" else o.color_weight)
+        # data-filler doodles are not tied to the narration: they fill long pauses (below)
+        fillers = [e for e in els if e.get("filler")]
+        mains = [e for e in els if not e.get("filler")]
 
-        plans = []
+        def plan(seq, protect):
+            out = []
+            for i, el in enumerate(seq):
+                allowed = self.allowed_mask(el, seq[i + 1:] + protect)
+                pts, draw, radius, rmask = self.plan_element(el, allowed)
+                mode, ink_s, col_s = self.element_timing(el, allowed, pts, draw, radius, rmask)
+                out.append([el, allowed, pts, draw, radius, rmask, mode, ink_s, col_s])
+            return out
+
         t0 = time.time()
-        for i, el in enumerate(els):
-            allowed = self.allowed_mask(el, els[i + 1:])
-            pts, draw, radius, rmask = self.plan_element(el, allowed)
-            plans.append((el, allowed, pts, draw, radius, rmask))
+        plans = plan(mains, fillers)
+        timeline = self._timeline(plans, total_f, to_f)
+        if fillers:
+            plans, timeline = self._place_fillers(plans, timeline, plan(fillers, mains), total_f, to_f)
         if o.verbose:
-            print(f"  planned {len(els)} elements in {time.time() - t0:.1f}s")
+            print(f"  planned {len(plans)} elements in {time.time() - t0:.1f}s")
 
         f = 0
         hand_xy = None
-        for i, (el, allowed, pts, draw, radius, rmask) in enumerate(plans):
-            start_f = max(f, to_f(el["reveal"]["startMs"]))
-            dur_f = max(2, to_f(el["reveal"]["durationMs"]))
+        for i, ((el, allowed, pts, draw, radius, rmask, mode, ink_s, col_s), (t_start, use_f)) in \
+                enumerate(zip(plans, timeline)):
+            start_f = max(f, t_start)
+            if o.idle_hand == "stretch":
+                ink_f = max(1, int(round(use_f * o.ink_weight / wsum))) if mode != "none" else use_f
+            else:
+                ink_f = max(1, use_f - int(round(use_f * col_s / (ink_s + col_s)))) if col_s > 0 else use_f
+            color_f = use_f - ink_f if mode != "none" else 0
             first_xy = tuple(pts[0]) if len(pts) else None
             cam = self._camera_target_for(el)
             self._gap(sink, start_f - f, hand_xy, first_xy, cam)
-            ink_f = max(1, int(round(dur_f * o.ink_weight / wsum)))
-            color_f = dur_f - ink_f if o.color_fill != "none" else 0
             end_xy = self._ink_phase(sink, ink_f, pts, draw, radius, rmask, cam)
             # make sure every line pixel of the element is on the board before colouring
             left = self.ink_reveal & allowed
             self.drawn[left] = self.ink_paint[left]
-            if o.color_fill == "none":
+            if mode == "none" or color_f <= 0:
                 self.drawn[allowed] = self.color[allowed]
             else:
-                cxy = self._color_phase(sink, color_f, allowed, pts, cam)
+                cxy = self._color_phase(sink, color_f, allowed, pts, cam, mode)
                 end_xy = cxy or end_xy
             hand_xy = end_xy
             f = start_f + ink_f + color_f
             if o.verbose:
                 print(f"  [{i + 1}/{len(plans)}] {el.get('label') or el.get('id')}: "
-                      f"{len(pts)} pen samples, frames {start_f}-{f}")
+                      f"ink {ink_s:.2f}s colour {mode} {col_s:.2f}s, "
+                      f"{len(pts)} pen samples, frames {start_f}-{f} "
+                      f"(slot {to_f(el['reveal']['startMs'])}+{to_f(el['reveal']['durationMs'])})")
 
         # outro: hand leaves, board cross-fades to the complete picture, camera returns
         remaining = total_f - f
@@ -800,6 +971,8 @@ def _parse_args(argv=None):
     p.add_argument("--ink-style", default="original", choices=["original", "threshold"])
     p.add_argument("--color-fill", default="contour-wipe", choices=["contour-wipe", "brush", "fade", "none"])
     p.add_argument("--camera", default="none", choices=["none", "follow"])
+    p.add_argument("--idle-hand", default="exit", choices=["exit", "stretch"],
+                   help="exit: natural pace, the hand leaves during pauses; stretch: fill every time slot")
     p.add_argument("--paper", default="#F6F1E3", help="paper colour hex")
     p.add_argument("--crf", type=int, default=18)
     p.add_argument("--preset", default="veryfast")
@@ -820,7 +993,7 @@ def main(argv=None) -> int:
         w, h = default_size_for(a.image, a.cap_long_edge or 1920)
     opts = RenderOptions(width=w, height=h, fps=a.fps, ink_path=a.ink_path, ink_style=a.ink_style,
                          color_fill=a.color_fill, camera=a.camera, paper_hex=a.paper, hand=a.hand,
-                         crf=a.crf, preset=a.preset)
+                         idle_hand=a.idle_hand, crf=a.crf, preset=a.preset)
     if a.grid_edge:
         opts.grid_edge = a.grid_edge
     if a.draft:

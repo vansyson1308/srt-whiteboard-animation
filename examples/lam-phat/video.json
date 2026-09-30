@@ -11,16 +11,16 @@
   "transition": { "type": "fade", "ms": 350 },
   "scenes": [
     { "id": "scene-01", "svg": "scenes/scene-01.svg",
-      "narration": "Có một tên trộm lấy tiền của bạn mỗi ngày, mà không cần mở ví. Tờ 100 nghìn vẫn là 100 nghìn, nhưng năm sau nó mua được ít hơn. Tên trộm đó là lạm phát." },
+      "narration": "[hồi hộp] Có một tên trộm lấy tiền của bạn mỗi ngày, mà không cần mở ví. Tờ 100 nghìn vẫn là 100 nghìn, nhưng năm sau nó mua được ít hơn. Tên trộm đó là lạm phát." },
     { "id": "scene-02", "svg": "scenes/scene-02.svg",
-      "narration": "Tưởng tượng một hòn đảo chỉ có 10 bao gạo và 100 đồng xu. Mỗi bao có giá 10 xu. Giờ ai đó in thêm 100 xu nữa. Gạo vẫn chỉ có 10 bao, nên mỗi bao lên giá 20 xu." },
+      "narration": "Tưởng tượng một hòn đảo chỉ có 10 bao gạo và 100 đồng xu. Mỗi bao có giá 10 xu. Giờ ai đó in thêm 100 xu nữa. [chậm] Gạo vẫn chỉ có 10 bao, nên mỗi bao lên giá 20 xu." },
     { "id": "scene-03", "svg": "scenes/scene-03.svg",
       "narration": "Đó là bản chất của lạm phát: tiền tăng nhanh hơn hàng hóa. Giá cũng tăng khi chi phí sản xuất đắt lên, như xăng dầu. Dù vì lý do gì, kết quả vẫn vậy: mỗi đồng tiền mua được ít đi." },
     { "id": "scene-04", "svg": "scenes/scene-04.svg",
-      "narration": "Lạm phát 4% một năm nghe thì nhỏ. Nhưng bát phở 50 nghìn hôm nay, sau 18 năm sẽ thành khoảng 100 nghìn. Mẹo nhẩm: lấy 72 chia cho tỷ lệ lạm phát, ra số năm để giá tăng gấp đôi." },
+      "narration": "Lạm phát 4% một năm nghe thì nhỏ. [cao trào] Nhưng bát phở 50 nghìn hôm nay, sau 18 năm sẽ thành khoảng 100 nghìn. Mẹo nhẩm: lấy 72 chia cho tỷ lệ lạm phát, ra số năm để giá tăng gấp đôi." },
     { "id": "scene-05", "svg": "scenes/scene-05.svg",
       "narration": "Nhưng giá giảm liên tục cũng nguy hiểm: ai cũng chờ rẻ hơn mới mua, và kinh tế chững lại. Vì vậy nhiều ngân hàng trung ương nhắm khoảng 2% một năm. Còn khi in tiền mất kiểm soát, như Zimbabwe năm 2008, giá cả tăng gấp đôi chỉ sau khoảng một ngày." },
     { "id": "scene-06", "svg": "scenes/scene-06.svg", "voice": { "style": "story", "rate": "+8%" },
-      "narration": "Vậy bạn nên làm gì? Đừng chỉ hỏi mình có bao nhiêu tiền, hãy hỏi nó mua được bao nhiêu. Tiền gửi lãi 3% mà lạm phát 4%, bạn đang nghèo đi 1% mỗi năm. [pause 400ms] Hãy để tiền của bạn, và cả kỹ năng của bạn, lớn nhanh hơn lạm phát." }
+      "narration": "Vậy bạn nên làm gì? Đừng chỉ hỏi mình có bao nhiêu tiền, hãy hỏi nó mua được bao nhiêu. [chậm] Tiền gửi lãi 3% mà lạm phát 4%, bạn đang nghèo đi 1% mỗi năm. [pause 400ms] [vui] Hãy để tiền của bạn, và cả kỹ năng của bạn, lớn nhanh hơn lạm phát." }
   ]
 }
