@@ -1,0 +1,28 @@
+{
+  "title": "Vì sao bầu trời màu xanh?",
+  "name": "vi-sao-bau-troi-mau-xanh",
+  "formats": ["portrait", "landscape"],
+  "fps": 30,
+  "voice": { "engine": "edge", "voice": "vi-VN-NamMinhNeural", "rate": "+8%" },
+  "captions": { "enabled": true, "karaoke": true, "maxWords": 6 },
+  "render": { "camera": "follow", "cameraMaxZoom": 1.2 },
+  "sfx": { "pen": true, "volumeDb": -17 },
+  "transition": { "type": "fade", "ms": 350 },
+  "scenes": [
+    {
+      "id": "scene-01",
+      "svg": "scenes/scene-01.svg",
+      "narration": "Bạn có bao giờ tự hỏi: vì sao bầu trời lại có màu xanh? Mỗi ngày, Mặt Trời chiếu ánh sáng xuống Trái Đất. Ánh sáng ấy đi xuyên qua bầu trời, và khi ta ngước nhìn lên, ta thấy một màu xanh dịu mắt."
+    },
+    {
+      "id": "scene-02",
+      "svg": "scenes/scene-02.svg",
+      "narration": "Thật ra, ánh sáng trắng của Mặt Trời là hỗn hợp của rất nhiều màu. Khi đi qua lăng kính, nó tách ra thành một dải màu, từ đỏ đến tím. Mỗi màu có một bước sóng khác nhau: ánh sáng đỏ có sóng dài, còn ánh sáng xanh có sóng ngắn."
+    },
+    {
+      "id": "scene-03",
+      "svg": "scenes/scene-03.svg",
+      "narration": "Không khí chứa vô số phân tử rất nhỏ. Khi ánh sáng va vào chúng, ánh sáng xanh với sóng ngắn bị tán xạ ra mọi hướng, mạnh hơn ánh sáng đỏ rất nhiều. Hiện tượng này gọi là tán xạ Rayleigh. Vì vậy, dù nhìn về hướng nào, mắt ta cũng nhận được ánh sáng xanh, và bầu trời hiện lên màu xanh."
+    }
+  ]
+}

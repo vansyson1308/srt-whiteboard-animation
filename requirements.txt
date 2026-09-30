@@ -1,0 +1,9 @@
+opencv-python>=4.8
+numpy>=1.24
+av>=12
+Pillow>=10
+edge-tts>=7.0
+resvg-py>=0.2
+svgelements>=1.9
+# dev
+pytest>=8

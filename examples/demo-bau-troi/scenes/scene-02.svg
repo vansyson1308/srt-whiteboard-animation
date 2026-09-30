@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <!-- Cảnh 2: ánh sáng trắng là hỗn hợp nhiều màu -->
+  <g id="beam" data-label="Tia sáng trắng" data-say="ánh sáng trắng">
+    <circle cx="170" cy="330" r="60" fill="#f6c453" stroke="#2b2b2b" stroke-width="6"/>
+    <path d="M240 330 L 600 330" fill="none" stroke="#2b2b2b" stroke-width="10" stroke-linecap="round"/>
+    <path d="M240 312 L 600 318 M240 348 L 600 342" fill="none" stroke="#9a9a9a" stroke-width="3" stroke-linecap="round"/>
+    <text x="300" y="285" font-family="Patrick Hand" font-size="46" fill="#2b2b2b">ánh sáng trắng</text>
+  </g>
+  <g id="prism" data-label="Lăng kính" data-say="lăng kính">
+    <path d="M700 150 L 860 470 L 540 470 Z" fill="#eef5fb" stroke="#2b2b2b" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M700 205 L 815 440" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+    <text x="630" y="530" font-family="Patrick Hand" font-size="44" fill="#2b2b2b">lăng kính</text>
+  </g>
+  <g id="rainbow" data-label="Dải màu" data-say="tách ra">
+    <g fill="none" stroke-width="9" stroke-linecap="round">
+      <path d="M760 330 L 1220 200" stroke="#e04b3a"/>
+      <path d="M760 335 L 1220 240" stroke="#e8743b"/>
+      <path d="M760 340 L 1220 280" stroke="#f2c230"/>
+      <path d="M760 345 L 1220 320" stroke="#4caf50"/>
+      <path d="M760 350 L 1220 360" stroke="#3b7dd8"/>
+      <path d="M760 355 L 1220 400" stroke="#3949ab"/>
+      <path d="M760 360 L 1220 440" stroke="#8e44ad"/>
+    </g>
+    <text x="1250" y="215" font-family="Patrick Hand" font-size="38" fill="#e04b3a">đỏ</text>
+    <text x="1250" y="455" font-family="Patrick Hand" font-size="38" fill="#8e44ad">tím</text>
+  </g>
+  <g id="long-wave" data-label="Sóng dài (đỏ)" data-say="sóng dài">
+    <path d="M180 660 C 280 560, 380 560, 480 660 S 680 760, 780 660" fill="none" stroke="#e04b3a" stroke-width="8" stroke-linecap="round"/>
+    <text x="820" y="680" font-family="Patrick Hand" font-size="44" fill="#e04b3a">đỏ: sóng dài</text>
+  </g>
+  <g id="short-wave" data-label="Sóng ngắn (xanh)" data-say="sóng ngắn">
+    <path d="M180 790 q 40 -60 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0" fill="none" stroke="#3b7dd8" stroke-width="8" stroke-linecap="round"/>
+    <text x="820" y="810" font-family="Patrick Hand" font-size="44" fill="#3b7dd8">xanh: sóng ngắn</text>
+  </g>
+</svg>

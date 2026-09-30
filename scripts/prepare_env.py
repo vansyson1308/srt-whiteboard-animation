@@ -29,7 +29,10 @@ DEPS: dict[str, str] = {
     "cv2": "opencv-python",
     "numpy": "numpy",
     "av": "av",  # PyAV：纯 pip 安装的 H.264 编码，无需系统 ffmpeg
-    "PIL": "Pillow",  # render_annotation_preview.py 画区域编号预览图（含中文标签）
+    "PIL": "Pillow",  # captions, annotation preview
+    "edge_tts": "edge-tts",  # free neural TTS (Vietnamese voices) with word timings
+    "resvg_py": "resvg-py",  # SVG -> PNG without system libraries
+    "svgelements": "svgelements",  # SVG path geometry -> vector pen strokes
 }
 
 
