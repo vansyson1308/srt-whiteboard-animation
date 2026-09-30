@@ -232,8 +232,9 @@ def test_hand_exits_sideways_on_tall_frames():
     assert r.hand.h <= int(0.42 * 270) + 1            # hand scaled to the short side
 
 
-def test_generated_music():
+@pytest.mark.parametrize("seed", [3, 4, 5])      # 4 and 5 start the first note before t=0
+def test_generated_music(seed):
     import gen_music
-    a = gen_music.generate(4.0, "calm")
+    a = gen_music.generate(4.0, "calm", seed=seed)
     assert a.shape == (4 * wb_video.SAMPLE_RATE, 2)
     assert 0.5 < float(np.max(np.abs(a))) <= 0.81

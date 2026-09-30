@@ -60,6 +60,7 @@ FORMATS = {"landscape": (1920, 1080), "portrait": (1080, 1920), "square": (1080,
 # renders are cached by content; include the renderer's own code so code changes invalidate the cache
 RENDERER_HASH = hashlib.sha256(b"".join(
     (SCRIPTS / f).read_bytes() for f in ("render_stream_whiteboard.py", "stream_render.py"))).hexdigest()[:16]
+SVG_BUILDER_HASH = hashlib.sha256((SCRIPTS / "svg_scene.py").read_bytes()).hexdigest()[:16]
 SR = wv.SAMPLE_RATE
 
 
@@ -145,7 +146,7 @@ def prepare_scene(scene: dict, pdir: Path, bdir: Path, paper: str) -> tuple[Path
         svg = pdir / scene["svg"]
         out = bdir / "scenes"
         out.mkdir(parents=True, exist_ok=True)
-        key = sha(file_hash(svg), paper, 2)
+        key = sha(file_hash(svg), paper, SVG_BUILDER_HASH)
         png, annp = out / f"{svg.stem}.png", out / f"{svg.stem}.annotation.json"
         stamp = out / f"{svg.stem}.key"
         if not (png.exists() and annp.exists() and stamp.exists() and stamp.read_text() == key):
@@ -392,12 +393,14 @@ def build_audio(voices: list[SceneVoice], scene_frames: list[int], fps: int, pro
     music_cfg = dict(proj.get("music") or {})
     if music_cfg.get("generate") and not music_cfg.get("file"):
         import gen_music
-        style = music_cfg["generate"] if isinstance(music_cfg["generate"], str) else "calm"
-        gp = pdir / "build" / f"music-{style}-{int(total / SR) + 1}s.wav"
+        style = music_cfg["generate"]
+        style = style if isinstance(style, str) and style in gen_music.STYLES else "calm"
+        secs = int(math.ceil(total / SR))          # the cached file always covers the whole video
+        gp = pdir / "build" / f"music-{style}-{secs}s.wav"
         if not gp.exists():
-            log(f"  generating {style} background music ({total / SR:.0f}s)")
+            log(f"  generating {style} background music ({secs}s)")
             gp.parent.mkdir(parents=True, exist_ok=True)
-            wv.save_wav(gp, gen_music.generate(total / SR + 0.5, style))
+            wv.save_wav(gp, gen_music.generate(secs + 0.5, style))
         music_cfg["file"] = str(gp)
     if music_cfg.get("file"):
         mp = pdir / music_cfg["file"]
@@ -597,7 +600,9 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
         elif rcfg.get("hand") is False:
             opts["hand"] = None
         mask_hash = file_hash(base / ann["maskFile"]) if ann.get("maskFile") else ""
-        key = sha(file_hash(img), ann, opts, mask_hash, RENDERER_HASH)[:14]
+        hand_file = opts["hand"] if "hand" in opts else RenderOptions().hand   # None = no hand
+        hand_hash = file_hash(Path(hand_file)) if hand_file else ""
+        key = sha(file_hash(img), ann, opts, mask_hash, hand_hash, RENDERER_HASH)[:14]
         jobs_list.append({"id": sc["id"], "image": str(img), "annotation": ann, "base": str(base),
                           "out": str(rdir / f"{sc['id']}-{key}.mp4"),
                           "activity": str(rdir / f"{sc['id']}-{key}.activity.json"),

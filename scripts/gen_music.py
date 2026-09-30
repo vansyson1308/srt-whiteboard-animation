@@ -50,6 +50,8 @@ def _tone(freq: float, dur: float, harmonics=(1.0, 0.35, 0.12), attack=0.01, dec
 
 def _add(buf: np.ndarray, x: np.ndarray, start: float, pan: float = 0.0, gain: float = 1.0) -> None:
     i = int(start * SR)
+    if i < 0:                      # humanised timing can land slightly before t=0
+        x, i = x[-i:], 0
     if i >= len(buf):
         return
     x = x[:len(buf) - i] * gain
