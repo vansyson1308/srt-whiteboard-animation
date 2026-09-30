@@ -104,10 +104,12 @@ def hex_to_rgb(h: str) -> tuple[int, int, int]:
 DEFAULTS = {
     "fps": 30,
     "formats": ["landscape"],
-    "voice": {"engine": "edge", "voice": "vi-VN-HoaiMyNeural", "style": "natural", "rate": "+0%", "pitch": "+0Hz"},
+    # best free voice: offline VieNeu-TTS male narrator; falls back to edge NamMinh if vieneu isn't installed
+    "voice": {"engine": "vieneu", "voice": "Hải Đăng", "style": "natural", "rate": "+0%", "pitch": "+0Hz",
+              "fx": "broadcast"},
     "captions": {"enabled": True, "karaoke": True, "maxWords": 6, "uppercase": False, "box": False},
     "render": {"inkPath": "skeleton", "colorFill": "contour-wipe", "camera": "follow", "cameraMaxZoom": 1.2,
-               "paper": "#F6F1E3", "hand": None, "handHeightRatio": 0.42},
+               "paper": "#F6F1E3", "hand": None, "handHeightRatio": 0.42, "humanMotion": True, "penLift": 14},
     "sync": {"leadMs": 250, "voiceDelayMs": 200, "minDrawMs": 900, "maxDrawMs": 4500, "tailMs": 800},
     "transition": {"type": "fade", "ms": 350},
     "audio_master": {"lufs": -14.0},
@@ -190,7 +192,10 @@ class SceneVoice:
 
 
 VOICE_KEYS = ("voice", "style", "rate", "pitch", "pauseScale", "phrasing", "lexicon", "instructions",
-              "language", "reference", "referenceText", "confirmAuthorizedVoice")
+              "language", "reference", "referenceText", "confirmAuthorizedVoice", "chunk")
+
+
+_WARNED: dict = {}
 
 
 def scene_voice_cfg(scene: dict, voice: dict, pdir: Path) -> dict:
@@ -212,6 +217,12 @@ def tts_scene(scene: dict, voice: dict, bdir: Path, delay_ms: int, engine_overri
         return SceneVoice(None, [], 0)
     voice = scene_voice_cfg(scene, voice, pdir or bdir.parent)
     engine = engine_override or voice.get("engine", "edge")
+    if not tts.engine_available(engine):
+        if not _WARNED.get(engine):
+            log(f"  !! engine '{engine}' is not installed (pip install {engine}); using edge vi-VN-NamMinhNeural")
+            _WARNED[engine] = True
+        voice = {**voice, "engine": "edge", "voice": "vi-VN-NamMinhNeural"}
+        engine = "edge"
     cfg = {k: voice.get(k) for k in VOICE_KEYS}
     if engine != voice.get("engine"):
         cfg["voice"] = None                           # --engine override: that engine's default voice
@@ -235,9 +246,9 @@ def tts_scene(scene: dict, voice: dict, bdir: Path, delay_ms: int, engine_overri
                              style=style, pause_scale=float(cfg.get("pauseScale") or 1.0),
                              lexicon=cfg.get("lexicon"), phrasing=cfg.get("phrasing", True) is not False,
                              reference=cfg.get("reference"), reference_text=cfg.get("referenceText"),
-                             consent=cfg.get("confirmAuthorizedVoice") is True)
+                             consent=cfg.get("confirmAuthorizedVoice") is True, chunk=cfg.get("chunk"))
         meta.write_text(json.dumps(res.to_json(), ensure_ascii=False), encoding="utf-8")
-    audio = wv.load_audio(res.audio)
+    audio = wv.polish_voice(wv.load_audio(res.audio), voice.get("fx", "broadcast"))
     audio = np.concatenate([wv.silence(delay_ms), audio])
     words = [tts.Word(w.text, w.startMs + delay_ms, w.endMs + delay_ms) for w in res.words]
     end = words[-1].endMs if words else delay_ms
@@ -621,6 +632,7 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
         opts = dict(width=w, height=h, fps=fps, ink_path=rcfg["inkPath"], color_fill=rcfg["colorFill"],
                     camera=rcfg["camera"], camera_max_zoom=float(rcfg["cameraMaxZoom"]),
                     paper_hex=rcfg["paper"], hand_height_ratio=float(rcfg["handHeightRatio"]),
+                    human_motion=bool(rcfg["humanMotion"]), pen_lift=float(rcfg["penLift"]),
                     crf=24 if draft else 14, preset="ultrafast" if draft else "veryfast", verbose=False)
         if rcfg.get("hand"):
             opts["hand"] = str((pdir / rcfg["hand"]).resolve())
@@ -694,7 +706,7 @@ def init_project(d: Path) -> Path:
     proj = {
         "title": "Tiêu đề video",
         "formats": ["portrait", "landscape"],
-        "voice": {"engine": "edge", "voice": "vi-VN-HoaiMyNeural", "style": "natural", "rate": "+5%"},
+        "voice": {"engine": "vieneu", "voice": "Hải Đăng", "style": "podcast"},
         "music": {"file": None, "volumeDb": -20},
         "scenes": [{"id": "scene-01", "svg": "scenes/scene-01.svg",
                     "narration": "Viết lời thoại của cảnh một ở đây. Mỗi phần tử có data-say sẽ được vẽ khi câu đó được đọc."}],

@@ -113,6 +113,18 @@ CATALOGUE: dict[str, list[dict]] = {
             ("Sadaltager", "male", "Knowledgeable"), ("Algieba", "male", "Smooth"), ("Gacrux", "male", "Mature"),
         ]
     ],
+    "vieneu": [   # VieNeu-TTS v3 Turbo presets (offline, Apache-2.0); region · style
+        {"id": v, "gender": g, "note": n} for v, g, n in [
+            ("Hải Đăng", "male", "Bắc · tự nhiên"), ("Thiện Minh", "male", "Bắc · kể chuyện"),
+            ("Minh Đức", "male", "Bắc · tin tức"), ("Thanh Bình", "male", "Bắc · kể chuyện"),
+            ("Quốc Tuấn", "male", "Bắc · tự nhiên"), ("Minh Triết", "male", "Nam · tin tức"),
+            ("Thái Sơn", "male", "Nam · kể chuyện"), ("Quang Sơn", "male", "Trung · tự nhiên"),
+            ("Mai Anh", "female", "Bắc · tin tức"), ("Trúc Ly", "female", "Bắc · tự nhiên"),
+            ("Ngọc Linh", "female", "Bắc · kể chuyện"), ("Đoan Trang", "female", "Bắc · tự nhiên"),
+            ("Thùy Dung", "female", "Nam · tin tức"), ("Thục Đoan", "female", "Nam · kể chuyện"),
+            ("Ngọc Trân", "female", "Trung · tự nhiên"),
+        ]
+    ],
     "tiktok": [
         {"id": "BV074_streaming", "gender": "female", "note": "Chị Vi - giọng TikTok quen thuộc"},
         {"id": "BV075_streaming", "gender": "male", "note": "Anh Vi - giọng TikTok quen thuộc"},
@@ -122,8 +134,9 @@ CATALOGUE: dict[str, list[dict]] = {
         {"id": "21m00Tcm4TlvDq8ikWAM", "gender": "female", "note": "Rachel (ElevenLabs) - điềm tĩnh"},
     ],
     "elevenlabs": [
-        {"id": "pNInz6obpgDQGcFmaJgB", "gender": "male", "note": "Adam"},
-        {"id": "21m00Tcm4TlvDq8ikWAM", "gender": "female", "note": "Rachel"},
+        {"id": "FTYCiQT21H9XQvhRu0ch", "gender": "male", "note": "MinhTrung - giọng Việt (mặc định)"},
+        {"id": "<voice_id>", "gender": "", "note": "giọng Việt khác trong Voice Library (Gentle Linh, "
+                                                  "Soft Spoken Huong, Tram...) hoặc giọng bạn tự clone"},
     ],
     "openai": [{"id": v, "gender": "", "note": ""} for v in
                ("alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer")],

@@ -8,13 +8,18 @@ Engines (Vietnamese-capable; voice catalogue: ``python voice_studio.py x --catal
               With a ``style`` it runs in *expressive* mode (Voice Studio, from ttspromax):
               one request per sentence with its own rate/pitch, breath commas, and exact,
               style-aware pauses stitched in between.
-  gemini      GEMINI_API_KEY.  LLM voices (Kore, Charon, Sulafat, ...) that read with
-              context-aware intonation and follow the style direction ("audiobook narrator").
+  gemini      GEMINI_API_KEY (free tier).  LLM voices (Sulafat, Kore, Charon, ...) that follow
+              the style direction ("audiobook narrator"); one request per sentence.
+  vieneu      VieNeu-TTS v3 Turbo - free, offline, Apache-2.0 Vietnamese model on CPU
+              (``pip install vieneu``).  25 preset voices (Hải Đăng, Thiện Minh, Mai Anh, ...),
+              or cloning from a consented reference clip.
   tiktok      the TikTok voices (BV074_streaming "Chị Vi", BV075_streaming "Anh Vi") via a
               public proxy (TIKTOK_TTS_PROXY to override).  No key.
   makevoice   ElevenLabs voices through makevoice.io (unofficial, no key, may change).
-  elevenlabs  ELEVENLABS_API_KEY; /with-timestamps -> real character timings.
+  elevenlabs  ELEVENLABS_API_KEY; /with-timestamps -> real character timings.  Newest model
+              first (eleven_v4 -> eleven_v3 -> eleven_flash_v2_5), Vietnamese voice by default.
   openai      OPENAI_API_KEY; gpt-4o-mini-tts; the style becomes its ``instructions``.
+              OPENAI_BASE_URL points it at any OpenAI-compatible server (e.g. ``vieneu serve``).
   fish        FISH_API_KEY + ``pip install fish-audio-sdk``.  A fish.audio voice model id,
               or cloning from ``reference`` audio - only with the speaker's consent
               (``consent=True`` / "confirmAuthorizedVoice": true).
@@ -37,6 +42,7 @@ import argparse
 import asyncio
 import base64
 import json
+import math
 import os
 import re
 import sys
@@ -51,19 +57,24 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import voice_studio as vs  # noqa: E402
 
-ENGINES = ["edge", "gemini", "tiktok", "makevoice", "elevenlabs", "openai", "fish", "silent"]
+ENGINES = ["edge", "gemini", "vieneu", "elevenlabs", "openai", "fish", "tiktok", "makevoice", "silent"]
 DEFAULT_VOICES = {
     "edge": "vi-VN-HoaiMyNeural",
     "gemini": "Sulafat",
+    "vieneu": "Hải Đăng",
     "tiktok": "BV074_streaming",
     "makevoice": "pNInz6obpgDQGcFmaJgB",
     "openai": "alloy",
-    "elevenlabs": "21m00Tcm4TlvDq8ikWAM",
+    "elevenlabs": "FTYCiQT21H9XQvhRu0ch",     # "MinhTrung", Vietnamese male
     "fish": "",
     "silent": "",
 }
 OPENAI_TTS_MODEL = os.environ.get("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
-ELEVENLABS_MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_flash_v2_5")
+# newest first; a model the account/API doesn't know falls through to the next one
+ELEVENLABS_MODELS = ([os.environ["ELEVENLABS_MODEL"]] if os.environ.get("ELEVENLABS_MODEL")
+                     else ["eleven_v4", "eleven_v3", "eleven_flash_v2_5"])
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+VIENEU_MODE = os.environ.get("VIENEU_MODE", "v3turbo")      # or v3nano for weak CPUs
 GEMINI_TTS_MODEL = os.environ.get("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
 TIKTOK_TTS_PROXY = os.environ.get("TIKTOK_TTS_PROXY", "https://tiktok-tts.weilnet.workers.dev/api/generation")
 FISH_TTS_MODEL = os.environ.get("FISH_TTS_MODEL", "s2-pro")
@@ -319,13 +330,13 @@ def _post_json(url: str, payload: dict, headers: dict, what: str = "TTS request"
 
 
 def _openai(text: str, out: Path, voice: str, instructions: str | None) -> None:
-    key = os.environ.get("OPENAI_API_KEY")
+    key = os.environ.get("OPENAI_API_KEY") or ("local" if "api.openai.com" not in OPENAI_BASE_URL else None)
     if not key:
         raise RuntimeError("OPENAI_API_KEY is not set")
     payload = {"model": OPENAI_TTS_MODEL, "voice": voice, "input": text, "response_format": "mp3"}
     if instructions:
         payload["instructions"] = instructions
-    out.write_bytes(_post_json("https://api.openai.com/v1/audio/speech", payload,
+    out.write_bytes(_post_json(f"{OPENAI_BASE_URL}/audio/speech", payload,
                                {"Authorization": f"Bearer {key}"}))
 
 
@@ -333,12 +344,22 @@ def _elevenlabs(text: str, out: Path, voice: str, language: str | None) -> list[
     key = os.environ.get("ELEVENLABS_API_KEY")
     if not key:
         raise RuntimeError("ELEVENLABS_API_KEY is not set")
-    payload = {"text": text, "model_id": ELEVENLABS_MODEL}
-    if language:
-        payload["language_code"] = language
-    data = json.loads(_post_json(
-        f"https://api.elevenlabs.io/v1/text-to-speech/{voice}/with-timestamps?output_format=mp3_44100_128",
-        payload, {"xi-api-key": key}))
+    data, last = None, None
+    for model in ELEVENLABS_MODELS:
+        payload = {"text": text, "model_id": model}
+        if language:
+            payload["language_code"] = language
+        try:
+            data = json.loads(_post_json(
+                f"https://api.elevenlabs.io/v1/text-to-speech/{voice}/with-timestamps?output_format=mp3_44100_128",
+                payload, {"xi-api-key": key}, "ElevenLabs TTS"))
+            break
+        except RuntimeError as e:     # unknown model / no timestamps for it: try the next one
+            last = e
+            if any(f"HTTP {c}" in str(e) for c in (401, 402, 403, 429)):
+                raise
+    if data is None:
+        raise RuntimeError(f"ElevenLabs TTS failed for {ELEVENLABS_MODELS}: {last}")
     out.write_bytes(base64.b64decode(data["audio_base64"]))
     al = data.get("alignment") or data.get("normalized_alignment") or {}
     chars = al.get("characters", [])
@@ -459,6 +480,104 @@ def _fish(text: str, voice: str, reference: str | None, reference_text: str | No
         raise RuntimeError("fish engine needs a voice (model id) or a reference clip")
     audio = FishAudio().tts.convert(**kw)
     return audio if isinstance(audio, bytes) else b"".join(audio)
+
+
+_VIENEU: dict = {}
+_VIENEU_LOCK = __import__("threading").Lock()
+
+
+def _vieneu_model():
+    """Load VieNeu-TTS once per process (~20 s the first time, then cached)."""
+    if "tts" in _VIENEU:
+        return _VIENEU["tts"]
+    try:
+        from vieneu import Vieneu
+        from vieneu._v3_turbo_engine import onnx_runtime_lite as orl
+    except ImportError as e:
+        raise RuntimeError("vieneu engine needs: pip install vieneu") from e
+    root = Path(os.environ.get("VIENEU_CACHE", Path.home() / ".cache" / "wb-video" / "vieneu"))
+
+    def fetch(repo: str, files: list, subfolder: str | None) -> Path:
+        # Real files instead of HF-cache symlinks: onnxruntime >= 1.2x rejects ONNX
+        # external data that resolves outside the model's own directory.
+        from huggingface_hub import hf_hub_download
+        last = None
+        for fn in files:
+            try:
+                last = hf_hub_download(repo, fn, subfolder=subfolder or None,
+                                       local_dir=root / repo.replace("/", "--"))
+            except Exception:
+                if fn.endswith(".json"):
+                    continue
+                raise
+        return Path(last).parent
+    orl.OnnxV3LiteEngine._fetch = staticmethod(fetch)
+    _VIENEU["tts"] = Vieneu(mode=VIENEU_MODE)
+    return _VIENEU["tts"]
+
+
+def vieneu_voices() -> list[str]:
+    return [vid for _, vid in _vieneu_model().list_preset_voices()]
+
+
+def engine_available(engine: str) -> bool:
+    """False when an optional engine's package is missing (callers fall back to edge)."""
+    import importlib.util
+    mod = {"vieneu": "vieneu", "fish": "fishaudio"}.get(engine)
+    return mod is None or importlib.util.find_spec(mod) is not None
+
+
+def plausible_speech(text: str, pcm, lo: float = 0.55, hi: float = 1.8) -> float:
+    """How far the voiced length is from what the text needs (1.0 = as expected).
+
+    Generative voices occasionally babble, stall or swallow words; those takes are
+    far off the ~4.5 syllables/s of narration.  Returns the ratio voiced/expected.
+    """
+    import wb_video
+    iv = _voiced_intervals(pcm, 250)
+    voiced = sum(e - s for s, e in iv) / 1000.0
+    syllables = sum(_speech_weight(t) for t in tokens(text)) / 5.5
+    expected = max(0.4, syllables / 4.5)
+    return voiced / expected if len(pcm) > wb_video.SAMPLE_RATE // 20 else 0.0
+
+
+VIENEU_TAKES = int(os.environ.get("VIENEU_TAKES", "3"))    # max takes per sentence
+
+
+def _vieneu(text: str, voice: str, reference: str | None, tmp: Path):
+    """One VieNeu synthesis -> mono float32 at 48 kHz.  A take whose length is
+    implausible for the text (babbling / swallowed words) is generated again and the
+    most plausible take is kept."""
+    import wb_video
+    best, best_err = None, float("inf")
+    for _ in range(max(1, VIENEU_TAKES)):
+        with _VIENEU_LOCK:                      # CPU-bound and not re-entrant
+            tts = _vieneu_model()
+            if reference:
+                wav = tts.infer(text, ref_audio=reference)
+            else:
+                if tts.resolve_voice_name(voice) is None:
+                    raise RuntimeError(f"unknown VieNeu voice {voice!r}; available: {vieneu_voices()}")
+                wav = tts.infer(text, voice=tts.get_preset_voice(voice))
+            rate = tts.sample_rate
+        pcm = _vieneu_to48k(wav, rate, tmp)
+        ratio = plausible_speech(text, pcm)
+        err = abs(math.log(max(ratio, 1e-3)))
+        if err < best_err:
+            best, best_err = pcm, err
+        if 0.55 <= ratio <= 1.8:
+            break
+    return best
+
+
+def _vieneu_to48k(wav, rate: int, tmp: Path):
+    import wb_video
+    f = tmp.with_suffix(".wav")
+    wb_video.save_wav(f, wav, sample_rate=rate)
+    try:
+        return wb_video.load_audio(f, stereo=False)      # resamples if rate != 48 kHz
+    finally:
+        f.unlink(missing_ok=True)
 
 
 def _decode(data: bytes, suffix: str, tmp: Path):
@@ -687,9 +806,11 @@ def _speech_span(audio_path: Path) -> tuple[int, int, int]:
     return int(on[0] * 1000 / wb_video.SAMPLE_RATE), int(on[-1] * 1000 / wb_video.SAMPLE_RATE), total
 
 
-SENTENCE_ENGINES = {"edge", "tiktok"}          # one request per sentence
-BLOCK_CHARS = {"gemini": 1500, "openai": 1500, "makevoice": 1500, "fish": 1500}
-PARALLEL = {"edge": 4, "tiktok": 3, "gemini": 3, "openai": 3, "makevoice": 2, "fish": 2}
+# One request per sentence: exact sentence boundaries + planned pauses (the timing of
+# engines without timestamps then only has to be estimated inside one sentence).
+SENTENCE_ENGINES = {"edge", "tiktok", "gemini", "vieneu"}
+BLOCK_CHARS = {"gemini": 1500, "openai": 1500, "makevoice": 1500, "fish": 1500, "vieneu": 600}
+PARALLEL = {"edge": 4, "tiktok": 3, "gemini": 3, "openai": 3, "makevoice": 2, "fish": 2, "vieneu": 1}
 
 
 def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | None = None,
@@ -697,10 +818,11 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
                instructions: str | None = None, language: str | None = "vi",
                style: str | None = None, pause_scale: float = 1.0, lexicon: dict | list | None = None,
                phrasing: bool = True, reference: str | None = None, reference_text: str | None = None,
-               consent: bool = False) -> TTSResult:
+               consent: bool = False, chunk: str | None = None) -> TTSResult:
     """Speak ``text`` into ``out``.  ``style`` (natural/news/story/podcast/ads) turns on the
-    Voice Studio: per-sentence prosody + planned pauses (edge/tiktok) or a style direction
-    (gemini/openai).  ``style=None`` or "plain" keeps a single request (edge/openai)."""
+    Voice Studio: per-sentence prosody + planned pauses (edge/tiktok/vieneu) or a style
+    direction (gemini/openai).  ``style=None`` or "plain" keeps a single request (edge/openai).
+    ``chunk`` = "sentence" | "paragraph" overrides how the text is split into requests."""
     import wb_video
     if engine not in ENGINES:
         raise ValueError(f"unknown TTS engine: {engine} (choose from {', '.join(ENGINES)})")
@@ -713,7 +835,7 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
         style = None
     if style is not None and style not in vs.STYLE_PRESETS:
         raise ValueError(f"unknown voice style: {style} (choose from {', '.join(vs.STYLES)})")
-    if engine == "fish" and reference and not consent:
+    if engine in ("fish", "vieneu") and reference and not consent:
         raise RuntimeError("Voice cloning needs the speaker's consent: set \"confirmAuthorizedVoice\": true "
                            "only after they agreed (tts.py --confirm-authorized-voice).")
 
@@ -733,7 +855,9 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
         words = align_to_text(display, spoken) if spoken else anchor_words(display, wb_video.load_audio(out, stereo=False))
         return TTSResult(str(out), _speech_span(out)[2], words, engine, voice)
 
-    per_sentence = engine in SENTENCE_ENGINES
+    if chunk not in (None, "sentence", "paragraph"):
+        raise ValueError(f"chunk must be 'sentence' or 'paragraph', not {chunk!r}")
+    per_sentence = engine in SENTENCE_ENGINES if chunk is None else chunk == "sentence"
     plan = vs.plan_script(text, style or "natural",
                           rate if engine == "edge" else 0, pitch if engine == "edge" else 0,
                           pause_scale, phrasing=phrasing and per_sentence, lexicon=lexicon,
@@ -743,7 +867,7 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
     if per_sentence:
         units = [[s] for s in plan.segments]
     else:
-        units = _group_blocks(plan.segments, BLOCK_CHARS[engine])
+        units = _group_blocks(plan.segments, BLOCK_CHARS.get(engine, 1500))
     tmp = out.parent / f".{out.stem}.parts"
     tmp.mkdir(exist_ok=True)
     direct = instructions or vs.direction(plan.style, plan.lang)
@@ -772,6 +896,8 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
             pcm = _decode(_makevoice(spoken, voice, language), ".mp3", part)
         elif engine == "fish":
             pcm = _decode(_fish(spoken, voice, reference, reference_text), ".wav", part)
+        elif engine == "vieneu":
+            pcm = _vieneu(spoken, voice, reference, part)
         else:  # openai with a style: the style direction becomes the instructions
             f = part.with_suffix(".mp3")
             _openai(spoken, f, voice, direct)
@@ -818,17 +944,20 @@ def main(argv=None) -> int:
                    help="fish: the speaker of --reference consented to this voice clone")
     p.add_argument("--srt", default=None)
     p.add_argument("--words", default=None)
-    p.add_argument("--list-voices", default=None, metavar="LOCALE_PREFIX")
+    p.add_argument("--chunk", default=None, choices=["sentence", "paragraph"])
+    p.add_argument("--list-voices", default=None, metavar="LOCALE_PREFIX",
+                   help="edge voices for a locale; 'vieneu' lists the VieNeu presets")
     a = p.parse_args(argv)
     if a.list_voices is not None:
-        print(json.dumps(list_voices(a.list_voices), ensure_ascii=False, indent=2))
+        voices = vieneu_voices() if a.list_voices == "vieneu" else list_voices(a.list_voices)
+        print(json.dumps(voices, ensure_ascii=False, indent=2))
         return 0
     if not a.text or not a.out:
         p.error("text and out are required")
     text = Path(a.text[1:]).read_text(encoding="utf-8") if a.text.startswith("@") else a.text
     r = synthesize(text, a.out, a.engine, a.voice, a.rate, a.pitch, instructions=a.instructions,
                    style=a.style, pause_scale=a.pause_scale, reference=a.reference,
-                   reference_text=a.reference_text, consent=a.confirm_authorized_voice)
+                   reference_text=a.reference_text, consent=a.confirm_authorized_voice, chunk=a.chunk)
     if a.srt:
         Path(a.srt).write_text(words_to_srt(r.words), encoding="utf-8")
     if a.words:

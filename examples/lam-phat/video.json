@@ -3,7 +3,7 @@
   "name": "lam-phat",
   "formats": ["portrait"],
   "fps": 30,
-  "voice": { "engine": "edge", "voice": "vi-VN-NamMinhNeural", "style": "podcast", "rate": "+4%" },
+  "voice": { "engine": "vieneu", "voice": "Hải Đăng", "style": "podcast" },
   "captions": { "enabled": true, "karaoke": true, "maxWords": 5 },
   "music": { "generate": "bright", "volumeDb": -26, "duck": true, "duckDb": -8 },
   "sfx": { "pen": true, "volumeDb": -17 },

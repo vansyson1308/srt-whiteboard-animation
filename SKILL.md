@@ -75,11 +75,12 @@ Xem `*-qa.jpg` một lần cuối, rồi báo cho người dùng: đường dẫ
 
 | Muốn | Đặt |
 |---|---|
-| Giọng nam | `"voice": {"voice": "vi-VN-NamMinhNeural"}` |
+| Giọng nam (mặc định) | VieNeu `Hải Đăng`; nam khác: `"voice": {"voice": "Thiện Minh"}` (kể chuyện), `"Minh Đức"` (tin tức), `"Thanh Bình"` |
 | Đọc nhanh hơn | `"voice": {"rate": "+10%"}` |
 | Đọc có hồn hơn | `"voice": {"style": "podcast"}` (hoặc `story` / `news` / `ads` / `natural`) |
-| Giọng hay nhất (cần key miễn phí) | `"voice": {"engine": "gemini", "voice": "Sulafat", "style": "story"}` + `GEMINI_API_KEY` |
-| Giọng TikTok quen thuộc | `"voice": {"engine": "tiktok", "voice": "BV074_streaming"}` (nữ) / `BV075_streaming` (nam) |
+| Giọng Việt tự nhiên, miễn phí, chạy offline | `"voice": {"engine": "vieneu", "voice": "Hải Đăng", "style": "podcast"}` (cần `pip install vieneu`) |
+| Giọng LLM hay nhất (key miễn phí) | `"voice": {"engine": "gemini", "voice": "Sulafat", "style": "story"}` + `GEMINI_API_KEY` |
+| Giọng cao cấp (trả phí) | `"voice": {"engine": "elevenlabs"}` + `ELEVENLABS_API_KEY` (mặc định giọng Việt MinhTrung) |
 | Đọc đúng từ viết tắt | `"voice": {"lexicon": {"GPT": "gi pi ti", "NASA": "na xa"}}` |
 | Nhạc nền không lo bản quyền | `"music": {"generate": "calm", "volumeDb": -24}` (hoặc `"bright"`) |
 | Nhạc nền của bạn | `"music": {"file": "music/bg.mp3", "volumeDb": -20}` |
@@ -96,17 +97,20 @@ Schema đầy đủ: **docs/PROJECT_FORMAT.md**.
 
 `"style"` bật "đạo diễn giọng đọc": mỗi câu được đọc riêng với tốc độ/cao độ theo loại câu (hỏi, cảm thán, đầu/cuối đoạn), thêm dấu phẩy lấy hơi trước từ nối trong câu dài, và ghép lại với khoảng lặng chính xác theo phong cách. Mặc định `"natural"`; `"plain"` = đọc một lượt như cũ.
 
+**Mặc định**: engine `vieneu`, giọng nam `Hải Đăng`, `"fx": "broadcast"` (lọc ù, tăng độ rõ, nén nhẹ như giọng phát thanh). Chưa cài `vieneu` thì tự chuyển sang edge `vi-VN-NamMinhNeural`. Mỗi câu VieNeu có độ dài bất thường (đọc lan man/nuốt chữ) được đọc lại, giữ bản tốt nhất (`VIENEU_TAKES`, mặc định 3).
+
 | Engine | Giọng (`voice`) | Cần | Ghi chú |
 |---|---|---|---|
-| `edge` (mặc định) | `vi-VN-HoaiMyNeural`, `vi-VN-NamMinhNeural`, `en-US-AndrewMultilingualNeural`, `en-US-AvaMultilingualNeural`, … | không | miễn phí, timestamp thật |
-| `gemini` | `Sulafat` (ấm), `Kore`, `Aoede`, `Leda`, `Despina`, `Charon` (nam, truyền đạt), `Algieba`, `Gacrux`, `Sadaltager`, … | `GEMINI_API_KEY` | hay nhất: mô hình LLM hiểu ngữ cảnh, làm theo `style` bằng lời |
-| `tiktok` | `BV074_streaming` (Chị Vi), `BV075_streaming` (Anh Vi) | không | giọng TikTok quen tai; qua proxy công khai |
-| `makevoice` | ID giọng ElevenLabs (`pNInz6obpgDQGcFmaJgB` Adam, …) | không | endpoint không chính thức, có thể đổi |
-| `elevenlabs` / `openai` | ID giọng / `alloy`, `nova`, … | API key | `openai` nhận `style` thành `instructions` |
+| `edge` (mặc định) | `vi-VN-HoaiMyNeural`, `vi-VN-NamMinhNeural`, `en-US-AndrewMultilingualNeural`, … | không | miễn phí, timestamp thật; chỉ 2 giọng Việt |
+| `vieneu` | Bắc: `Hải Đăng`, `Thiện Minh` (kể chuyện), `Minh Đức` (tin tức), `Thanh Bình`, `Mai Anh` (nữ, tin tức), `Ngọc Linh` (nữ, kể chuyện); Nam: `Minh Triết`, `Thùy Dung`; Trung: `Quang Sơn` (`tts.py --list-voices vieneu`) | `pip install vieneu` (~1 GB model tải lần đầu) | VieNeu-TTS v3 Turbo, Apache-2.0, chạy CPU (~1× thời gian thực); clone từ `"reference"` cần `"confirmAuthorizedVoice": true` |
+| `gemini` | `Sulafat` (ấm), `Kore`, `Aoede`, `Charon` (nam, truyền đạt), `Algieba`, `Gacrux`, … | `GEMINI_API_KEY` (có gói miễn phí) | LLM hiểu ngữ cảnh, làm theo `style` bằng lời; đọc từng câu (`"chunk": "paragraph"` để đọc cả đoạn) |
+| `elevenlabs` | mặc định `FTYCiQT21H9XQvhRu0ch` (MinhTrung), hoặc giọng Việt khác trong Voice Library / giọng bạn tự clone | `ELEVENLABS_API_KEY` | timestamp ký tự thật; tự thử `eleven_v4` → `eleven_v3` → `eleven_flash_v2_5` (`ELEVENLABS_MODEL` để cố định) |
+| `openai` | `alloy`, `nova`, … | `OPENAI_API_KEY` | `style` thành `instructions`; `OPENAI_BASE_URL` trỏ tới server tương thích (vd. `vieneu serve`) |
 | `fish` | model id trên fish.audio, hoặc clone từ `"reference"` + `"referenceText"` | `FISH_API_KEY`, `pip install fish-audio-sdk` | **chỉ clone giọng khi chính chủ đồng ý**: `"confirmAuthorizedVoice": true`; không commit file giọng mẫu |
+| `tiktok` / `makevoice` | `BV074_streaming`, `BV075_streaming` / ID ElevenLabs | không | qua dịch vụ trung gian không chính thức, điều khoản thương mại không rõ → **chỉ dùng làm nháp**, không dùng cho kênh kiếm tiền |
 
 Xem cách một đoạn sẽ được đọc (không cần mạng): `$PY scripts/voice_studio.py "Lời thoại…" --style story`. Danh sách giọng: `$PY scripts/voice_studio.py x --catalogue`.
-Engine không có timestamp (gemini/tiktok/makevoice/openai/fish) được căn thời gian bằng khoảng lặng trong audio khớp với dấu câu, nên `data-say` vẫn đồng bộ tốt (sai số ~0.1s); câu ngắn, dấu câu rõ ràng giúp đồng bộ chính xác hơn.
+Engine không có timestamp (vieneu/gemini/tiktok/makevoice/openai/fish) được căn thời gian bằng khoảng lặng trong audio khớp với dấu câu, nên `data-say` vẫn đồng bộ tốt (sai số ~0.1s); câu ngắn, dấu câu rõ ràng giúp đồng bộ chính xác hơn.
 
 ## Xử lý sự cố
 

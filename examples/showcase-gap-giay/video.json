@@ -3,7 +3,7 @@
   "name": "gap-giay-42-lan",
   "formats": ["portrait"],
   "fps": 30,
-  "voice": { "engine": "edge", "voice": "vi-VN-HoaiMyNeural", "style": "podcast", "rate": "+4%" },
+  "voice": { "engine": "vieneu", "voice": "Hải Đăng", "style": "podcast" },
   "captions": { "enabled": true, "karaoke": true, "maxWords": 5 },
   "music": { "generate": "calm", "volumeDb": -24, "duck": true, "duckDb": -8 },
   "sfx": { "pen": true, "volumeDb": -17 },

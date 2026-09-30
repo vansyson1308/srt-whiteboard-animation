@@ -187,3 +187,132 @@ def test_scene_voice_overrides(tmp_path):
     assert cfg["engine"] == "tiktok" and cfg["voice"] is None
     with pytest.raises(ValueError, match="style"):
         tts.synthesize("x", tmp_path / "x.mp3", "edge", style="opera")
+
+
+def test_vieneu_engine_per_sentence_and_consent(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_vieneu(text, voice, reference, tmp):
+        calls.append((text, voice, reference))
+        n = len(text.split())
+        return speech([(60, 60 + 260 * n)], 200 + 260 * n)
+
+    monkeypatch.setattr(tts, "_vieneu", fake_vieneu)
+    r = tts.synthesize("Lạm phát là gì? Nó lấy đi sức mua của tiền.", tmp_path / "v.mp3", "vieneu",
+                       style="news")
+    assert [c[1] for c in calls] == ["Hải Đăng", "Hải Đăng"]               # default voice, per sentence
+    assert r.audio.endswith(".wav") and len(r.words) == 11
+    gap = r.words[4].startMs - r.words[3].endMs
+    assert abs(gap - vs.STYLE_PRESETS["news"]["pauses"]["afterQuestion"]) <= 40
+    ref = tmp_path / "ref.wav"
+    ref.write_bytes(wav_bytes(speech([(0, 500)], 600)))
+    with pytest.raises(RuntimeError, match="consent"):
+        tts.synthesize("Xin chào.", tmp_path / "c.mp3", "vieneu", reference=str(ref))
+
+
+def test_chunk_override_groups_sentences(monkeypatch, tmp_path):
+    texts = []
+
+    def fake_gemini(text, voice, direction):
+        texts.append(text)
+        return wav_bytes(speech([(100, 900), (1200, 2000)], 2200))
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.setattr(tts, "_gemini", fake_gemini)
+    tts.synthesize("Câu một. Câu hai.", tmp_path / "a.mp3", "gemini")
+    assert texts == ["Câu một.", "Câu hai."]                               # sentence by default
+    texts.clear()
+    tts.synthesize("Câu một. Câu hai.", tmp_path / "b.mp3", "gemini", chunk="paragraph")
+    assert texts == ["Câu một. Câu hai."]
+    with pytest.raises(ValueError, match="chunk"):
+        tts.synthesize("x", tmp_path / "c.mp3", "gemini", chunk="word")
+
+
+def test_elevenlabs_falls_back_to_older_models(monkeypatch, tmp_path):
+    import base64
+    import json
+    tried = []
+
+    def fake_post(url, payload, headers, what=""):
+        tried.append(payload["model_id"])
+        if payload["model_id"] != "eleven_flash_v2_5":
+            raise RuntimeError(f"{what}: HTTP 400 model not found")
+        return json.dumps({"audio_base64": base64.b64encode(wav_bytes(speech([(50, 700)], 900))).decode(),
+                           "alignment": {"characters": list("Xin chào"),
+                                         "character_start_times_seconds": [i * 0.08 for i in range(8)],
+                                         "character_end_times_seconds": [i * 0.08 + 0.08 for i in range(8)]}
+                           }).encode()
+
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "test")
+    monkeypatch.setattr(tts, "_post_json", fake_post)
+    monkeypatch.setattr(tts, "ELEVENLABS_MODELS", ["eleven_v4", "eleven_v3", "eleven_flash_v2_5"])
+    r = tts.synthesize("Xin chào", tmp_path / "e.mp3", "elevenlabs")
+    assert tried == ["eleven_v4", "eleven_v3", "eleven_flash_v2_5"]
+    assert r.voice == "FTYCiQT21H9XQvhRu0ch" and [w.text for w in r.words] == ["Xin", "chào"]
+
+    def denied(url, payload, headers, what=""):
+        tried.append(payload["model_id"])
+        raise RuntimeError(f"{what}: HTTP 401 invalid api key")
+    tried.clear()
+    monkeypatch.setattr(tts, "_post_json", denied)
+    with pytest.raises(RuntimeError, match="401"):
+        tts.synthesize("Xin chào", tmp_path / "f.mp3", "elevenlabs")
+    assert tried == ["eleven_v4"]                                         # auth errors don't retry
+
+
+def test_vieneu_retries_implausible_takes(monkeypatch, tmp_path):
+    takes = iter([speech([(0, 9000)], 9500),            # babbling: 9 s for four syllables
+                  speech([(50, 1000)], 1200)])          # plausible
+    calls = []
+
+    class FakeTTS:
+        sample_rate = SR
+
+        def resolve_voice_name(self, v):
+            return v
+
+        def get_preset_voice(self, v):
+            return {"name": v}
+
+        def infer(self, text, voice=None, ref_audio=None):
+            calls.append(text)
+            return next(takes)
+
+    monkeypatch.setattr(tts, "_vieneu_model", lambda: FakeTTS())
+    pcm = tts._vieneu("Xin chào các bạn.", "Hải Đăng", None, tmp_path / "t")
+    assert len(calls) == 2 and len(pcm) < 2 * SR
+    assert 0.55 <= tts.plausible_speech("Xin chào các bạn.", pcm) <= 1.8
+
+
+def test_polish_voice_keeps_level_and_cuts_rumble():
+    t = np.arange(SR * 2) / SR
+    voice = 0.2 * np.sin(2 * np.pi * 220 * t) * (0.5 + 0.5 * np.sin(2 * np.pi * 3 * t) ** 2)
+    rumble = 0.2 * np.sin(2 * np.pi * 30 * t)
+    x = (voice + rumble).astype(np.float32)
+    y = wb_video.polish_voice(np.stack([x, x], axis=1))
+    assert y.shape == (len(x), 2) and np.max(np.abs(y)) <= 0.99
+    assert abs(np.sqrt(np.mean(y ** 2)) - np.sqrt(np.mean(x ** 2))) < 1e-3   # same RMS
+
+    def band(a, f0):
+        spec = np.abs(np.fft.rfft(a))
+        f = np.fft.rfftfreq(len(a), 1 / SR)
+        return spec[(f > f0 - 5) & (f < f0 + 5)].sum()
+    assert band(y[:, 0], 30) / band(y[:, 0], 220) < 0.3 * band(x, 30) / band(x, 220)
+    assert wb_video.polish_voice(x, "none") is x
+
+
+def test_unavailable_engine_falls_back_to_edge(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_synth(text, out, engine, voice, *a, **kw):
+        seen["engine"], seen["voice"] = engine, voice
+        f = Path(out).with_suffix(".wav")
+        wb_video.save_wav(f, speech([(0, 500)], 600))
+        return tts.TTSResult(str(f), 600, [tts.Word("Xin", 0, 200), tts.Word("chào.", 200, 500)], engine, voice)
+
+    monkeypatch.setattr(tts, "engine_available", lambda e: e != "vieneu")
+    monkeypatch.setattr(tts, "synthesize", fake_synth)
+    v = make_video.tts_scene({"id": "s1", "narration": "Xin chào."}, dict(make_video.DEFAULTS["voice"]),
+                             tmp_path, 200, None, tmp_path)
+    assert seen == {"engine": "edge", "voice": "vi-VN-NamMinhNeural"}
+    assert v.words[0].startMs == 200

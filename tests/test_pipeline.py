@@ -238,3 +238,22 @@ def test_generated_music(seed):
     a = gen_music.generate(4.0, "calm", seed=seed)
     assert a.shape == (4 * wb_video.SAMPLE_RATE, 2)
     assert 0.5 < float(np.max(np.abs(a))) <= 0.81
+
+
+def test_pen_timeline_human_pacing():
+    from render_stream_whiteboard import pen_timeline
+    # an L-shaped stroke (sharp corner at sample 20), then pen-up travel, then a straight stroke
+    a = np.array([[i * 3, 0] for i in range(21)] + [[60, i * 3] for i in range(1, 21)], np.float32)
+    b = np.array([[200 + i * 3, 100] for i in range(30)], np.float32)
+    pts, draw, rad = build_pen_plan([a, b], spacing=3.0, travel_speed=3.5, radii=[2, 2])
+    frames = 400
+    idx, up = pen_timeline(pts, draw, frames)
+    assert len(idx) == frames == len(up) and idx[-1] == len(pts) - 1
+    assert np.all(np.diff(idx) >= 0)                               # never goes back
+    per_frame = np.diff(np.concatenate([[0], idx]))
+    at = lambda k: int(np.searchsorted(idx, k))                     # noqa: E731  frame reaching sample k
+    assert at(23) - at(17) > 1.3 * (at(13) - at(7))               # slower through the corner
+    assert at(4) - at(1) > at(10) - at(7)                          # accelerates out of pen-down
+    assert up[draw[idx] == 0].mean() > up[draw[idx] == 1].mean()  # hand lifted while travelling
+    flat, _ = pen_timeline(pts, draw, frames, human=False)
+    assert flat[-1] == len(pts) - 1 and per_frame.sum() == len(pts) - 1

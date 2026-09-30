@@ -79,6 +79,8 @@ class RenderOptions:
     skeleton_spacing: float = 2.5
     skeleton_min_points: int = 6
     travel_speed: float = 3.5           # pen-up travel speed relative to drawing speed
+    human_motion: bool = True           # human pen timing: slow corners/stroke ends, dwell at pen-down/up
+    pen_lift: float = 14.0              # px (at 1080p) the hand rises while travelling between strokes
     crf: int = 18
     preset: str = "veryfast"
     verbose: bool = True
@@ -176,6 +178,73 @@ def build_pen_plan(strokes: list[np.ndarray], spacing: float, travel_speed: floa
         return np.zeros((0, 2), np.int32), np.zeros(0, bool), np.zeros(0, np.int32)
     return (np.round(np.concatenate(pts)).astype(np.int32), np.concatenate(flags),
             np.concatenate(rads))
+
+
+def pen_timeline(pts: np.ndarray, draw: np.ndarray, frames: int, human: bool = True
+                 ) -> tuple[np.ndarray, np.ndarray]:
+    """Map ``frames`` output frames onto pen samples like a human hand moves.
+
+    Every sample gets a time cost: drawing slows down in sharp turns and at both
+    ends of a stroke (accelerate, cruise, brake); pen-up travel eases in and out;
+    putting the pen down and lifting it cost a short dwell.  Frames are spread
+    evenly over the accumulated time, so the frame count is unchanged.
+
+    Returns (sample index per frame - non-decreasing, ends at the last sample;
+    pen-up amount 0..1 per frame, smoothed, for the hand-lift animation).
+    """
+    n = len(pts)
+    if n == 0 or frames <= 0:
+        return np.zeros(max(frames, 0), int), np.zeros(max(frames, 0), np.float32)
+    if not human or n < 3:
+        idx = np.round(np.linspace(0, n - 1, frames)).astype(int) if frames > 1 else np.array([n - 1])
+        return idx, (~draw[idx]).astype(np.float32)
+    p = pts.astype(np.float32)
+    seg = np.diff(p, axis=0)
+    seglen = np.maximum(np.hypot(seg[:, 0], seg[:, 1]), 1e-3)
+    step = float(np.median(seglen[draw[1:]])) if draw[1:].any() else float(np.median(seglen))
+    cost = np.zeros(n, np.float64)
+    cost[1:] = seglen / max(step, 1e-3)                      # distance-proportional base
+    # turning angle over a +-3 sample baseline (robust to pixel-jagged skeleton paths)
+    # -> slow down in corners; a peak-preserving kernel spreads it over the approach
+    bl = 3
+    turn = np.zeros(n)
+    if n > 2 * bl:
+        vin = p[bl:n - bl] - p[:n - 2 * bl]
+        vout = p[2 * bl:] - p[bl:n - bl]
+        nin = np.maximum(np.hypot(vin[:, 0], vin[:, 1]), 1e-3)
+        nout = np.maximum(np.hypot(vout[:, 0], vout[:, 1]), 1e-3)
+        cosang = np.sum(vin * vout, axis=1) / (nin * nout)
+        turn[bl:n - bl] = np.arccos(np.clip(cosang, -1, 1)) / math.pi
+        turn = np.maximum.reduce([np.roll(turn, sh) * w for sh, w in
+                                  ((-2, 0.5), (-1, 0.8), (0, 1.0), (1, 0.8), (2, 0.5))])
+    runs, start = [], 0                                       # contiguous draw / travel runs
+    for k in range(1, n + 1):
+        if k == n or draw[k] != draw[start]:
+            runs.append((start, k, bool(draw[start])))
+            start = k
+    for a, b, is_draw in runs:
+        m = b - a
+        t = (np.arange(m) + 0.5) / m
+        if is_draw:
+            edge = np.minimum(np.arange(m), np.arange(m)[::-1])            # samples from a stroke end
+            ramp = 1.0 + 0.9 * np.exp(-edge / 3.0)                         # accelerate / brake
+            cost[a:b] *= ramp * (1.0 + 2.5 * turn[a:b])
+            cost[a] += 3.0                                                 # pen touches down
+        else:
+            cost[a:b] *= 1.0 + 1.2 * (1.0 - np.sin(math.pi * t))           # glide: ease in/out
+            cost[a] += 2.0                                                 # pen lifts
+    cum = np.cumsum(cost)
+    total = cum[-1]
+    if total <= 0:
+        idx = np.full(frames, n - 1, int)
+    else:
+        targets = total * (np.arange(1, frames + 1) / frames)
+        idx = np.minimum(np.searchsorted(cum, targets - 1e-9), n - 1)
+        idx[-1] = n - 1
+    up = (~draw[idx]).astype(np.float32)
+    k = 3
+    smooth = np.convolve(np.pad(up, k, mode="edge"), np.ones(2 * k + 1) / (2 * k + 1), mode="valid")
+    return idx.astype(int), smooth.astype(np.float32)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -485,9 +554,10 @@ class SceneRenderer:
             for _ in range(frames):
                 self._emit(sink, None, cam_target)
             return None
-        idx = np.round(np.linspace(0, n - 1, frames)).astype(int) if frames > 1 else np.array([n - 1])
+        idx, up = pen_timeline(pts, draw, frames, self.opts.human_motion)
+        lift = self.opts.pen_lift * self.opts.scale_ref
         last = 0
-        for si in idx:
+        for si, u in zip(idx, up):
             drew = False
             for k in range(last + 1, si + 1):
                 if draw[k]:
@@ -495,7 +565,9 @@ class SceneRenderer:
                     drew = True
             last = max(last, si)
             self._act = 1.0 if drew else 0.0
-            self._emit(sink, pts[si], cam_target)
+            # while the pen is up the hand rises off the paper (and a touch to the right)
+            hx, hy = float(pts[si][0]) + 0.35 * lift * u, float(pts[si][1]) - lift * u
+            self._emit(sink, (hx, hy), cam_target)
         self._act = 0.0
         return tuple(pts[-1])
 
