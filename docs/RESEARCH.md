@@ -51,6 +51,11 @@ Top tính năng giữ chân người xem (tổng hợp từ VideoScribe, Doodly,
 - ElevenLabs: tiếng Việt có ở Flash/Turbo v2.5 và v3 (không có ở Multilingual v2); endpoint `/with-timestamps` trả timestamp ký tự – đã tích hợp (`ELEVENLABS_MODEL` cấu hình được).
 - OpenAI `gpt-4o-mini-tts`: có tiếng Việt, không có timestamp → ước lượng; nên thêm forced alignment.
 - Thay thế: FPT.AI, Viettel AI, Zalo AI (API chưa kiểm chứng), VieNeu-TTS (chạy local, clone giọng).
+- **Khảo sát 09/2026** (chi tiết: báo cáo "Giọng đọc tiếng Việt tốt nhất 2026"):
+  - Nhóm dẫn đầu tiếng Việt: Gemini 3.8 Flash TTS (23/09/2026, có free tier, không timestamp) và ElevenLabs v4 (28/09/2026, timestamp ký tự).
+  - Azure vi-VN vẫn chỉ HoaiMy/NamMinh, không có HD. Vbee/FPT/Viettel không trả timestamp từng từ.
+  - Mã nguồn mở: VieNeu-TTS v3 Turbo (Apache-2.0, CPU, WER 3,3% trên ViTTS-Bench) → engine `vieneu`. F5-TTS-Vietnamese và viXTTS chỉ phi thương mại.
+  - Proxy TikTok / MakeVoice và edge-tts không có điều khoản thương mại rõ ràng → chỉ dùng làm nháp.
 - Căn timestamp cho audio bất kỳ: WhisperX forced alignment (model tiếng Việt `nguyenvulebinh/wav2vec2-base-vi-vlsp2020`).
 
 **Tạo ảnh** (tên model đổi liên tục → để trong biến môi trường)

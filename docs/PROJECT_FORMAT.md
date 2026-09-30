@@ -10,11 +10,12 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
   "fps": 30,
 
   "voice": {                                 // TTS theo từng cảnh (null = không đọc)
-    "engine": "edge",                        // edge | gemini | tiktok | makevoice | elevenlabs | openai | fish | silent
+    "engine": "edge",                        // edge | vieneu | gemini | elevenlabs | openai | fish | tiktok | makevoice | silent
     "voice": "vi-VN-HoaiMyNeural",           // hoặc vi-VN-NamMinhNeural, Sulafat (gemini), BV074_streaming (tiktok)…
     "style": "natural",                      // natural | news | story | podcast | ads | plain (đọc một lượt)
     "rate": "+5%", "pitch": "+0Hz",          // cộng thêm vào phong cách (edge)
     "pauseScale": 1.0,                       // nhân độ dài khoảng lặng tự động (0.3–3)
+    "chunk": null,                           // "sentence" | "paragraph": mỗi request một câu hay cả đoạn (mặc định theo engine)
     "lexicon": {"GPT": "gi pi ti"},          // cách đọc từ viết tắt / tên riêng
     "instructions": null,                    // gemini/openai: tự mô tả giọng điệu (thay cho style)
     "reference": null, "referenceText": null, "confirmAuthorizedVoice": false   // fish: clone giọng có sự đồng ý

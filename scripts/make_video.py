@@ -190,7 +190,7 @@ class SceneVoice:
 
 
 VOICE_KEYS = ("voice", "style", "rate", "pitch", "pauseScale", "phrasing", "lexicon", "instructions",
-              "language", "reference", "referenceText", "confirmAuthorizedVoice")
+              "language", "reference", "referenceText", "confirmAuthorizedVoice", "chunk")
 
 
 def scene_voice_cfg(scene: dict, voice: dict, pdir: Path) -> dict:
@@ -235,7 +235,7 @@ def tts_scene(scene: dict, voice: dict, bdir: Path, delay_ms: int, engine_overri
                              style=style, pause_scale=float(cfg.get("pauseScale") or 1.0),
                              lexicon=cfg.get("lexicon"), phrasing=cfg.get("phrasing", True) is not False,
                              reference=cfg.get("reference"), reference_text=cfg.get("referenceText"),
-                             consent=cfg.get("confirmAuthorizedVoice") is True)
+                             consent=cfg.get("confirmAuthorizedVoice") is True, chunk=cfg.get("chunk"))
         meta.write_text(json.dumps(res.to_json(), ensure_ascii=False), encoding="utf-8")
     audio = wv.load_audio(res.audio)
     audio = np.concatenate([wv.silence(delay_ms), audio])

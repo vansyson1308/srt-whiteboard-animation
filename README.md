@@ -53,7 +53,7 @@ Trong SVG, mỗi nhóm `<g data-say="mặt trời">` sẽ được vẽ đúng l
 | | |
 |---|---|
 | ✍️ **Vẽ như người thật** | Cảnh SVG: bút đi theo nét vector thật, chữ được viết tay trái→phải. Ảnh raster: bút đi theo skeleton của nét, thứ tự gần-nhất để tay không nhảy. Tô màu sau khi vẽ nét. |
-| 🗣️ **Giọng đọc có hồn** | Voice Studio (từ [ttspromax](https://github.com/vansyson1308/ttspromax)): 5 phong cách đọc (tự nhiên / bản tin / kể chuyện / podcast / quảng cáo), ngữ điệu theo từng câu, ngắt nghỉ chuẩn. 8 engine: Edge (miễn phí), Gemini TTS, giọng TikTok, ElevenLabs/MakeVoice, OpenAI, Fish Audio (clone có sự đồng ý), hoặc giọng bạn tự thu + SRT. |
+| 🗣️ **Giọng đọc có hồn** | Voice Studio (từ [ttspromax](https://github.com/vansyson1308/ttspromax)): 5 phong cách đọc (tự nhiên / bản tin / kể chuyện / podcast / quảng cáo), ngữ điệu theo từng câu, ngắt nghỉ chuẩn. Engine: Edge, VieNeu-TTS (miễn phí, offline, 25 giọng Việt), Gemini TTS, ElevenLabs, OpenAI, Fish Audio (clone có sự đồng ý), hoặc giọng bạn tự thu + SRT. |
 | 🎯 **Nói tới đâu vẽ tới đó** | Mỗi phần tử có `say`; phần tử đầu vẽ ngay từ 0.15s (hook). |
 | 🎥 **Camera** | Zoom mượt vào phần tử đang vẽ, lùi ra toàn cảnh cuối mỗi cảnh; chuyển cảnh fade/slide. |
 | 💬 **Phụ đề karaoke** | Be Vietnam Pro, viền đậm, highlight từ đang đọc, nằm trong vùng an toàn TikTok; xuất kèm `.srt`. |

@@ -187,3 +187,74 @@ def test_scene_voice_overrides(tmp_path):
     assert cfg["engine"] == "tiktok" and cfg["voice"] is None
     with pytest.raises(ValueError, match="style"):
         tts.synthesize("x", tmp_path / "x.mp3", "edge", style="opera")
+
+
+def test_vieneu_engine_per_sentence_and_consent(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_vieneu(text, voice, reference, tmp):
+        calls.append((text, voice, reference))
+        n = len(text.split())
+        return speech([(60, 60 + 260 * n)], 200 + 260 * n)
+
+    monkeypatch.setattr(tts, "_vieneu", fake_vieneu)
+    r = tts.synthesize("Lạm phát là gì? Nó lấy đi sức mua của tiền.", tmp_path / "v.mp3", "vieneu",
+                       style="news")
+    assert [c[1] for c in calls] == ["Hải Đăng", "Hải Đăng"]               # default voice, per sentence
+    assert r.audio.endswith(".wav") and len(r.words) == 11
+    gap = r.words[4].startMs - r.words[3].endMs
+    assert abs(gap - vs.STYLE_PRESETS["news"]["pauses"]["afterQuestion"]) <= 40
+    ref = tmp_path / "ref.wav"
+    ref.write_bytes(wav_bytes(speech([(0, 500)], 600)))
+    with pytest.raises(RuntimeError, match="consent"):
+        tts.synthesize("Xin chào.", tmp_path / "c.mp3", "vieneu", reference=str(ref))
+
+
+def test_chunk_override_groups_sentences(monkeypatch, tmp_path):
+    texts = []
+
+    def fake_gemini(text, voice, direction):
+        texts.append(text)
+        return wav_bytes(speech([(100, 900), (1200, 2000)], 2200))
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.setattr(tts, "_gemini", fake_gemini)
+    tts.synthesize("Câu một. Câu hai.", tmp_path / "a.mp3", "gemini")
+    assert texts == ["Câu một.", "Câu hai."]                               # sentence by default
+    texts.clear()
+    tts.synthesize("Câu một. Câu hai.", tmp_path / "b.mp3", "gemini", chunk="paragraph")
+    assert texts == ["Câu một. Câu hai."]
+    with pytest.raises(ValueError, match="chunk"):
+        tts.synthesize("x", tmp_path / "c.mp3", "gemini", chunk="word")
+
+
+def test_elevenlabs_falls_back_to_older_models(monkeypatch, tmp_path):
+    import base64
+    import json
+    tried = []
+
+    def fake_post(url, payload, headers, what=""):
+        tried.append(payload["model_id"])
+        if payload["model_id"] != "eleven_flash_v2_5":
+            raise RuntimeError(f"{what}: HTTP 400 model not found")
+        return json.dumps({"audio_base64": base64.b64encode(wav_bytes(speech([(50, 700)], 900))).decode(),
+                           "alignment": {"characters": list("Xin chào"),
+                                         "character_start_times_seconds": [i * 0.08 for i in range(8)],
+                                         "character_end_times_seconds": [i * 0.08 + 0.08 for i in range(8)]}
+                           }).encode()
+
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "test")
+    monkeypatch.setattr(tts, "_post_json", fake_post)
+    monkeypatch.setattr(tts, "ELEVENLABS_MODELS", ["eleven_v4", "eleven_v3", "eleven_flash_v2_5"])
+    r = tts.synthesize("Xin chào", tmp_path / "e.mp3", "elevenlabs")
+    assert tried == ["eleven_v4", "eleven_v3", "eleven_flash_v2_5"]
+    assert r.voice == "FTYCiQT21H9XQvhRu0ch" and [w.text for w in r.words] == ["Xin", "chào"]
+
+    def denied(url, payload, headers, what=""):
+        tried.append(payload["model_id"])
+        raise RuntimeError(f"{what}: HTTP 401 invalid api key")
+    tried.clear()
+    monkeypatch.setattr(tts, "_post_json", denied)
+    with pytest.raises(RuntimeError, match="401"):
+        tts.synthesize("Xin chào", tmp_path / "f.mp3", "elevenlabs")
+    assert tried == ["eleven_v4"]                                         # auth errors don't retry
