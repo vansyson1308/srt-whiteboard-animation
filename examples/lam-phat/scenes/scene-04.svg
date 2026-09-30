@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 4: 4%/năm - bát phở 50k -> 100k sau 18 năm; quy tắc 72 -->
+  <g id="rate" data-label="4% mỗi năm" data-say="4%">
+    <text x="540" y="220" text-anchor="middle" font-family="Patrick Hand" font-size="110" fill="#e04b3a">4% mỗi năm</text>
+  </g>
+  <g id="bowl50" data-label="Phở 50 nghìn" data-say="50 nghìn">
+    <path d="M200 330 C 180 360, 220 380, 200 410 M260 320 C 240 350, 280 375, 260 410" fill="none" stroke="#9a9a9a" stroke-width="5" stroke-linecap="round"/>
+    <path d="M110 450 L 390 450 Q 380 590 250 600 Q 120 590 110 450 Z" fill="#ffffff" stroke="#2b2b2b" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M140 475 C 190 500, 290 460, 360 480 M150 505 C 210 525, 290 490, 350 510" fill="none" stroke="#f6c453" stroke-width="6" stroke-linecap="round"/>
+    <path d="M310 440 L 400 330 M335 445 L 425 340" fill="none" stroke="#8a5a2b" stroke-width="7" stroke-linecap="round"/>
+    <text x="250" y="690" text-anchor="middle" font-family="Patrick Hand" font-size="66" fill="#2b2b2b">50.000đ</text>
+  </g>
+  <g id="years" data-label="18 năm" data-say="18 năm">
+    <path d="M430 540 L 640 540 M618 520 L 642 540 L 618 560" fill="none" stroke="#3b7dd8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="535" y="505" text-anchor="middle" font-family="Patrick Hand" font-size="60" fill="#3b7dd8">18 năm</text>
+  </g>
+  <g id="bowl100" data-label="Phở 100 nghìn" data-say="100 nghìn">
+    <path d="M780 330 C 760 360, 800 380, 780 410 M840 320 C 820 350, 860 375, 840 410" fill="none" stroke="#9a9a9a" stroke-width="5" stroke-linecap="round"/>
+    <path d="M690 450 L 970 450 Q 960 590 830 600 Q 700 590 690 450 Z" fill="#ffffff" stroke="#2b2b2b" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M720 475 C 770 500, 870 460, 940 480 M730 505 C 790 525, 870 490, 930 510" fill="none" stroke="#f6c453" stroke-width="6" stroke-linecap="round"/>
+    <path d="M890 440 L 980 330 M915 445 L 1005 340" fill="none" stroke="#8a5a2b" stroke-width="7" stroke-linecap="round"/>
+    <text x="830" y="690" text-anchor="middle" font-family="Patrick Hand" font-size="66" fill="#e04b3a">100.000đ</text>
+  </g>
+  <g id="rule72" data-label="Quy tắc 72" data-say="72 chia">
+    <rect x="130" y="800" width="820" height="250" rx="24" fill="#eef5fb" stroke="#2b2b2b" stroke-width="6"/>
+    <text x="540" y="875" text-anchor="middle" font-family="Patrick Hand" font-size="56" fill="#3b7dd8">Quy tắc 72</text>
+    <text x="540" y="990" text-anchor="middle" font-family="Patrick Hand" font-size="96" fill="#2b2b2b">72 ÷ 4 = 18 năm</text>
+  </g>
+</svg>

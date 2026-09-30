@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 3: bản chất - tiền nặng hơn hàng; chi phí tăng; sức mua giảm -->
+  <g id="title" data-label="Bản chất" data-say="bản chất">
+    <text x="540" y="200" text-anchor="middle" font-family="Patrick Hand" font-size="100" fill="#2b2b2b">Bản chất</text>
+    <path d="M360 235 C 460 222, 620 222, 720 235" fill="none" stroke="#e8743b" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <g id="money" data-label="Tiền tăng" data-say="tiền tăng">
+    <path d="M540 380 L 540 860" fill="none" stroke="#2b2b2b" stroke-width="10" stroke-linecap="round"/>
+    <path d="M470 900 L 540 850 L 610 900 Z" fill="#9a9a9a" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M230 470 L 850 350" fill="none" stroke="#2b2b2b" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="540" cy="410" r="16" fill="#e8743b" stroke="#2b2b2b" stroke-width="5"/>
+    <path d="M230 470 L 150 620 M230 470 L 310 620" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/>
+    <path d="M130 620 Q 230 690 330 620 Z" fill="#ffffff" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <ellipse cx="195" cy="605" rx="38" ry="13" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+    <ellipse cx="265" cy="605" rx="38" ry="13" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+    <ellipse cx="230" cy="585" rx="38" ry="13" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+    <ellipse cx="200" cy="565" rx="38" ry="13" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+    <ellipse cx="258" cy="560" rx="38" ry="13" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+    <text x="210" y="760" text-anchor="middle" font-family="Patrick Hand" font-size="64" fill="#3b7dd8">Tiền</text>
+    <path d="M290 765 L 290 705 M272 725 L 290 703 L 308 725" fill="none" stroke="#3b7dd8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="goods" data-label="Hàng hóa" data-say="hàng hóa">
+    <path d="M850 350 L 770 480 M850 350 L 930 480" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/>
+    <path d="M750 480 Q 850 550 950 480 Z" fill="#ffffff" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <rect x="800" y="430" width="50" height="46" rx="4" fill="#e8743b" stroke="#2b2b2b" stroke-width="4"/>
+    <circle cx="885" cy="455" r="20" fill="#e04b3a" stroke="#2b2b2b" stroke-width="4"/>
+    <text x="850" y="620" text-anchor="middle" font-family="Patrick Hand" font-size="64" fill="#2b2b2b">Hàng hóa</text>
+  </g>
+  <g id="cost" data-label="Chi phí tăng" data-say="chi phí">
+    <rect x="130" y="940" width="120" height="160" rx="12" fill="#e04b3a" stroke="#2b2b2b" stroke-width="6"/>
+    <rect x="152" y="965" width="76" height="46" rx="6" fill="#ffffff" stroke="#2b2b2b" stroke-width="4"/>
+    <path d="M250 975 C 300 975, 300 1040, 280 1070" fill="none" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>
+    <text x="320" y="1045" font-family="Patrick Hand" font-size="64" fill="#e8743b">chi phí</text>
+    <path d="M520 1050 L 520 990 M502 1010 L 520 988 L 538 1010" fill="none" stroke="#e8743b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="power" data-label="Sức mua giảm" data-say="mỗi đồng tiền">
+    <circle cx="700" cy="990" r="62" fill="#f6c453" stroke="#2b2b2b" stroke-width="6"/>
+    <text x="700" y="1015" text-anchor="middle" font-family="Patrick Hand" font-size="70" fill="#2b2b2b">đ</text>
+    <path d="M780 990 L 845 990 M828 975 L 848 990 L 828 1005" fill="none" stroke="#3b7dd8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="900" cy="990" r="28" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <text x="780" y="1110" text-anchor="middle" font-family="Patrick Hand" font-size="54" fill="#e04b3a">sức mua</text>
+    <path d="M885 1060 L 885 1110 M869 1092 L 885 1112 L 901 1092" fill="none" stroke="#e04b3a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
