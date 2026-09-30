@@ -57,6 +57,9 @@ import wb_video as wv  # noqa: E402
 from render_stream_whiteboard import RenderOptions, render_scene  # noqa: E402
 
 FORMATS = {"landscape": (1920, 1080), "portrait": (1080, 1920), "square": (1080, 1080)}
+# renders are cached by content; include the renderer's own code so code changes invalidate the cache
+RENDERER_HASH = hashlib.sha256(b"".join(
+    (SCRIPTS / f).read_bytes() for f in ("render_stream_whiteboard.py", "stream_render.py"))).hexdigest()[:16]
 SR = wv.SAMPLE_RATE
 
 
@@ -386,7 +389,16 @@ def build_audio(voices: list[SceneVoice], scene_frames: list[int], fps: int, pro
     voice = np.concatenate(parts) if parts else np.zeros((0, 2), np.float32)
     total = len(voice)
     mix = voice.copy()
-    music_cfg = proj.get("music") or {}
+    music_cfg = dict(proj.get("music") or {})
+    if music_cfg.get("generate") and not music_cfg.get("file"):
+        import gen_music
+        style = music_cfg["generate"] if isinstance(music_cfg["generate"], str) else "calm"
+        gp = pdir / "build" / f"music-{style}-{int(total / SR) + 1}s.wav"
+        if not gp.exists():
+            log(f"  generating {style} background music ({total / SR:.0f}s)")
+            gp.parent.mkdir(parents=True, exist_ok=True)
+            wv.save_wav(gp, gen_music.generate(total / SR + 0.5, style))
+        music_cfg["file"] = str(gp)
     if music_cfg.get("file"):
         mp = pdir / music_cfg["file"]
         if mp.exists():
@@ -585,7 +597,7 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
         elif rcfg.get("hand") is False:
             opts["hand"] = None
         mask_hash = file_hash(base / ann["maskFile"]) if ann.get("maskFile") else ""
-        key = sha(file_hash(img), ann, opts, mask_hash, 3)[:14]
+        key = sha(file_hash(img), ann, opts, mask_hash, RENDERER_HASH)[:14]
         jobs_list.append({"id": sc["id"], "image": str(img), "annotation": ann, "base": str(base),
                           "out": str(rdir / f"{sc['id']}-{key}.mp4"),
                           "activity": str(rdir / f"{sc['id']}-{key}.activity.json"),

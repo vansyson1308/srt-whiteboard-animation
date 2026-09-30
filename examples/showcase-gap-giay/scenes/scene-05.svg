@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 5: bài học 1% mỗi ngày -->
+  <g id="axes" data-label="Trục thời gian" data-say="chính bạn">
+    <path d="M140 170 L 140 880 L 950 880" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M125 195 L 140 165 L 155 195 M 925 865 L 955 880 L 925 895" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="820" y="945" font-family="Patrick Hand" font-size="54" fill="#2b2b2b">1 năm</text>
+    <circle cx="140" cy="720" r="10" fill="#2b2b2b"/>
+  </g>
+  <g id="up" data-label="Giỏi hơn 1% mỗi ngày" data-say="giỏi hơn 1%">
+    <path d="M140 720 C 500 710, 700 640, 900 200" fill="none" stroke="#3b7dd8" stroke-width="9" stroke-linecap="round"/>
+    <text x="300" y="330" font-family="Patrick Hand" font-size="74" fill="#3b7dd8">1,01<tspan baseline-shift="super" font-size="46">365</tspan> ≈ 37,8</text>
+  </g>
+  <g id="down" data-label="Tệ đi 1% mỗi ngày" data-say="tệ đi 1%">
+    <path d="M140 720 C 330 830, 520 866, 900 872" fill="none" stroke="#e04b3a" stroke-width="9" stroke-linecap="round"/>
+    <text x="330" y="790" font-family="Patrick Hand" font-size="64" fill="#e04b3a">0,99<tspan baseline-shift="super" font-size="40">365</tspan> ≈ 0,03</text>
+  </g>
+  <g id="cta" data-label="Bắt đầu hôm nay" data-say="hôm nay">
+    <text x="540" y="1085" text-anchor="middle" font-family="Patrick Hand" font-size="96" fill="#e8743b">Bắt đầu từ hôm nay!</text>
+    <path d="M110 1010 l 14 -34 l 14 34 l -34 -20 l 40 0 z M 940 1010 l 14 -34 l 14 34 l -34 -20 l 40 0 z" fill="#f6c453" stroke="#2b2b2b" stroke-width="3" stroke-linejoin="round"/>
+  </g>
+</svg>

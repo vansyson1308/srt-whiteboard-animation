@@ -76,7 +76,9 @@ Xem `*-qa.jpg` một lần cuối, rồi báo cho người dùng: đường dẫ
 |---|---|
 | Giọng nam | `"voice": {"voice": "vi-VN-NamMinhNeural"}` |
 | Đọc nhanh hơn | `"voice": {"rate": "+10%"}` |
-| Nhạc nền | `"music": {"file": "music/bg.mp3", "volumeDb": -20}` |
+| Nhạc nền không lo bản quyền | `"music": {"generate": "calm", "volumeDb": -24}` (hoặc `"bright"`) |
+| Nhạc nền của bạn | `"music": {"file": "music/bg.mp3", "volumeDb": -20}` |
+| TikTok full màn hình | vẽ SVG `viewBox="0 0 1080 1920"`, `"formats": ["portrait"]`; giữ nội dung ở y 150–1120, chừa y 1150–1400 cho phụ đề – xem `examples/showcase-gap-giay/` |
 | Tên kênh trên bút | `$PY scripts/brand_hand.py "Tên Kênh" assets/my-hand.png` → `"render": {"hand": "../../assets/my-hand.png"}` |
 | Không có tay | `"render": {"hand": false}` |
 | Không zoom camera | `"render": {"camera": "none"}` |
@@ -105,4 +107,5 @@ Schema đầy đủ: **docs/PROJECT_FORMAT.md**.
 | `qa_frames.py` | Contact sheet + thông số video/âm thanh |
 | `generate_images.py` | Tạo ảnh line-art bằng OpenAI/Gemini (tuỳ chọn) |
 | `brand_hand.py` | In tên kênh lên bút |
+| `gen_music.py` | Nhạc nền procedural, không bản quyền |
 | `parse_srt.py`, `merge_scenes.py` | Công cụ SRT/ghép cảnh của quy trình cũ |

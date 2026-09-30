@@ -287,8 +287,9 @@ def build(svg_path: str | Path, out_dir: str | Path | None = None, width: int = 
     tree = ET.parse(svg_path)
     root = tree.getroot()
     vx, vy, vw, vh = viewbox(root)
-    W = int(width)
-    H = int(round(W * vh / vw))
+    s = width / max(vw, vh)            # `width` = long edge in pixels (portrait-safe)
+    W = int(round(vw * s))
+    H = int(round(vh * s))
     groups, svg_paper = split_elements(root)
     paper = svg_paper or paper
     for g in groups:           # give every group an id
@@ -365,7 +366,7 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="SVG scene -> PNG + annotation with vector strokes")
     p.add_argument("svg")
     p.add_argument("--out-dir", default=None)
-    p.add_argument("--width", type=int, default=1920)
+    p.add_argument("--width", type=int, default=1920, help="long edge in pixels")
     p.add_argument("--paper", default="#F6F1E3")
     p.add_argument("--sample-px", type=float, default=3.0)
     a = p.parse_args(argv)

@@ -212,3 +212,28 @@ def test_make_video_external_audio_and_srt(tmp_path):
     o = rep["outputs"][0]
     assert abs(o["durationSec"] - 6.0) < 0.1            # scene length == audio length (no drift)
     assert abs(o["audioSec"] - 6.0) < 0.15
+
+
+def test_svg_scene_portrait_uses_long_edge(tmp_path):
+    svg = tmp_path / "tall.svg"
+    svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">'
+                   '<g id="a"><circle cx="540" cy="500" r="100" fill="none" stroke="#222" stroke-width="6"/></g></svg>')
+    _, annp = svg_scene.build(svg, tmp_path, width=960)
+    assert json.loads(annp.read_text(encoding="utf-8"))["canvas"] == {"width": 540, "height": 960}
+
+
+def test_hand_exits_sideways_on_tall_frames():
+    import cv2
+    img = cv2.imread(str(MONKEY_PNG))
+    ann = json.loads(MONKEY_ANN.read_text(encoding="utf-8"))
+    r = SceneRenderer(img, ann, RenderOptions(width=270, height=480, fps=10, verbose=False))
+    x, y = r._hand_rest()
+    assert x >= r.W and y < r.H                       # off to the right, not through the caption band
+    assert r.hand.h <= int(0.42 * 270) + 1            # hand scaled to the short side
+
+
+def test_generated_music():
+    import gen_music
+    a = gen_music.generate(4.0, "calm")
+    assert a.shape == (4 * wb_video.SAMPLE_RATE, 2)
+    assert 0.5 < float(np.max(np.abs(a))) <= 0.81

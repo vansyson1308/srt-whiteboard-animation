@@ -21,6 +21,7 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
                 "box": false, "highlight": "#FFD60A", "size": 0 },
   "header": { "text": "Tiêu đề hiện ở bản dọc" },   // false để tắt; mặc định = title
   "music":  { "file": "music/nhac-nen.mp3", "volumeDb": -20, "duck": true, "duckDb": -8 },
+                                             // hoặc {"generate": "calm"|"bright"} = nhạc tự tạo, không bản quyền
   "sfx":    { "pen": true, "volumeDb": -17 },       // tiếng bút sột soạt khi đang vẽ
   "render": { "inkPath": "skeleton", "colorFill": "contour-wipe", "camera": "follow",
               "cameraMaxZoom": 1.2, "paper": "#F6F1E3", "hand": null, "handHeightRatio": 0.42 },

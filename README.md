@@ -6,6 +6,11 @@ Biến **một chủ đề, một kịch bản, hoặc file SRT** thành video g
 
 ![Demo: Vì sao bầu trời màu xanh?](examples/demo-bau-troi/demo-landscape.gif)
 
+<details><summary>Showcase TikTok 9:16: "Gập giấy 42 lần tới Mặt Trăng?" (59s, <code>examples/showcase-gap-giay</code>)</summary>
+
+![Showcase 9:16](examples/showcase-gap-giay/showcase-qa.jpg)
+</details>
+
 <details><summary>Bản dọc 9:16 (contact sheet QA)</summary>
 
 ![Bản dọc](examples/demo-bau-troi/demo-portrait-qa.jpg)
@@ -52,7 +57,7 @@ Trong SVG, mỗi nhóm `<g data-say="mặt trời">` sẽ được vẽ đúng l
 | 🎯 **Nói tới đâu vẽ tới đó** | Mỗi phần tử có `say`; phần tử đầu vẽ ngay từ 0.15s (hook). |
 | 🎥 **Camera** | Zoom mượt vào phần tử đang vẽ, lùi ra toàn cảnh cuối mỗi cảnh; chuyển cảnh fade/slide. |
 | 💬 **Phụ đề karaoke** | Be Vietnam Pro, viền đậm, highlight từ đang đọc, nằm trong vùng an toàn TikTok; xuất kèm `.srt`. |
-| 🎵 **Âm thanh chuẩn nền tảng** | Nhạc nền tự hạ khi có giọng (ducking), tiếng bút tổng hợp khi đang vẽ, chuẩn hoá -14 LUFS. |
+| 🎵 **Âm thanh chuẩn nền tảng** | Nhạc nền tự tạo không bản quyền (`gen_music.py`) hoặc nhạc của bạn, tự hạ khi có giọng (ducking), tiếng bút tổng hợp khi đang vẽ, chuẩn hoá -14 LUFS. |
 | 📐 **Đa định dạng** | 1080×1920, 1920×1080, 1080×1080 từ cùng một dự án; tiêu đề tự động cho bản dọc. |
 | ⏱️ **Không lệch tiếng** | Số khung và số mẫu âm thanh của từng cảnh khớp tuyệt đối. |
 | ⚡ **Nhanh & có cache** | Render song song, ghi H.264 trực tiếp; sửa một cảnh chỉ render lại cảnh đó. Demo 46s, 2 định dạng 1080p ≈ 2 phút trên 4 CPU. |
@@ -80,10 +85,11 @@ scripts/
   auto_annotate.py              ảnh raster → annotation tự động
   tts.py  timing.py             giọng đọc + đồng bộ theo từ
   captions.py  wb_video.py      phụ đề, I/O video & âm thanh (PyAV)
-  qa_frames.py  render_annotation_preview.py  brand_hand.py  generate_images.py
+  qa_frames.py  render_annotation_preview.py  brand_hand.py  generate_images.py  gen_music.py
   stream_render.py  parse_srt.py  merge_scenes.py  prepare_env.py
 assets/   bàn tay (drawing-hand-clean.png), font tiếng Việt (OFL), preview.html
-examples/demo-bau-troi/         dự án mẫu hoàn chỉnh (3 cảnh SVG)
+examples/demo-bau-troi/         dự án mẫu 16:9 + 9:16 (3 cảnh SVG)
+examples/showcase-gap-giay/     showcase TikTok 9:16 full màn hình (5 cảnh SVG)
 docs/     SVG_GUIDE.md, PROJECT_FORMAT.md, RESEARCH.md (nghiên cứu + lộ trình)
 tests/    bộ test chạy offline
 ```

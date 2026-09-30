@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 3: 20 lần = tòa nhà 100 m, 30 lần = xuyên khí quyển 100 km -->
+  <g id="twenty" data-label="Gập 20 lần" data-say="Gập 20 lần">
+    <path d="M540 1090 L 540 760" fill="none" stroke="#e8743b" stroke-width="16" stroke-linecap="round"/>
+    <text x="600" y="880" font-family="Patrick Hand" font-size="84" fill="#2b2b2b">20 lần</text>
+    <text x="600" y="975" font-family="Patrick Hand" font-size="74" fill="#e8743b">≈ 100 m</text>
+  </g>
+  <g id="building" data-label="Tòa nhà 30 tầng" data-say="tòa nhà">
+    <path d="M60 1092 L 1000 1092" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>
+    <rect x="200" y="740" width="200" height="352" fill="#ffffff" stroke="#2b2b2b" stroke-width="6"/>
+    <g fill="#dfeefe" stroke="#2b2b2b" stroke-width="3">
+      <rect x="225" y="770" width="40" height="36"/><rect x="280" y="770" width="40" height="36"/><rect x="335" y="770" width="40" height="36"/>
+      <rect x="225" y="830" width="40" height="36"/><rect x="280" y="830" width="40" height="36"/><rect x="335" y="830" width="40" height="36"/>
+      <rect x="225" y="890" width="40" height="36"/><rect x="280" y="890" width="40" height="36"/><rect x="335" y="890" width="40" height="36"/>
+      <rect x="225" y="950" width="40" height="36"/><rect x="280" y="950" width="40" height="36"/><rect x="335" y="950" width="40" height="36"/>
+    </g>
+    <rect x="275" y="1020" width="50" height="72" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+  </g>
+  <g id="thirty" data-label="Gập 30 lần" data-say="Gập 30 lần">
+    <path d="M540 740 L 540 200" fill="none" stroke="#e8743b" stroke-width="16" stroke-linecap="round" stroke-dasharray="40 18"/>
+    <path d="M505 235 L 540 190 L 575 235" fill="none" stroke="#e8743b" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="600" y="300" font-family="Patrick Hand" font-size="84" fill="#2b2b2b">30 lần</text>
+    <text x="600" y="395" font-family="Patrick Hand" font-size="74" fill="#e8743b">≈ 100 km</text>
+  </g>
+  <g id="sky" data-label="Tầng khí quyển" data-say="khí quyển">
+    <path d="M60 470 q 60 -30 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0 t 120 0" fill="none" stroke="#3b7dd8" stroke-width="6" stroke-linecap="round"/>
+    <path d="M90 600 q 15 -45 70 -38 q 25 -40 85 -20 q 55 -10 65 35 q 40 10 20 40 l -230 0 q -30 -8 -10 -17 z" fill="#dfeefe" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M740 580 L 900 515 L 800 600 Z M800 600 L 815 560 L 900 515" fill="#ffffff" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>
+    <text x="80" y="440" font-family="Patrick Hand" font-size="56" fill="#3b7dd8">khí quyển</text>
+  </g>
+</svg>
