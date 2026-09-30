@@ -9,7 +9,7 @@ One command: project JSON -> finished whiteboard explainer video(s).
 
 Pipeline
   1. scenes    SVG -> PNG + annotation (vector strokes); PNG without annotation -> auto-annotate
-  2. voice     per-scene TTS (edge / elevenlabs / openai / silent) with word timings,
+  2. voice     per-scene TTS (edge expressive / gemini / tiktok / elevenlabs / ...) with word timings,
                or one recorded audio file + SRT (+ optional word timings)
   3. sync      each element starts drawing when its `say` phrase is spoken
   4. render    scenes rendered in parallel, cached by content hash
@@ -104,7 +104,7 @@ def hex_to_rgb(h: str) -> tuple[int, int, int]:
 DEFAULTS = {
     "fps": 30,
     "formats": ["landscape"],
-    "voice": {"engine": "edge", "voice": "vi-VN-HoaiMyNeural", "rate": "+0%", "pitch": "+0Hz"},
+    "voice": {"engine": "edge", "voice": "vi-VN-HoaiMyNeural", "style": "natural", "rate": "+0%", "pitch": "+0Hz"},
     "captions": {"enabled": True, "karaoke": True, "maxWords": 6, "uppercase": False, "box": False},
     "render": {"inkPath": "skeleton", "colorFill": "contour-wipe", "camera": "follow", "cameraMaxZoom": 1.2,
                "paper": "#F6F1E3", "hand": None, "handHeightRatio": 0.42},
@@ -189,13 +189,34 @@ class SceneVoice:
         self.fixed_ms = fixed_ms      # scene length imposed by an external audio track
 
 
-def tts_scene(scene: dict, voice: dict, bdir: Path, delay_ms: int, engine_override: str | None) -> SceneVoice:
+VOICE_KEYS = ("voice", "style", "rate", "pitch", "pauseScale", "phrasing", "lexicon", "instructions",
+              "language", "reference", "referenceText", "confirmAuthorizedVoice")
+
+
+def scene_voice_cfg(scene: dict, voice: dict, pdir: Path) -> dict:
+    """Project voice + the scene's own "voice" overrides (e.g. {"style": "ads"} for the CTA)."""
+    cfg = dict(voice)
+    if isinstance(scene.get("voice"), dict):
+        cfg.update(scene["voice"])
+        if "engine" in scene["voice"] and "voice" not in scene["voice"]:
+            cfg["voice"] = None                       # another engine: use its default voice
+    if cfg.get("reference"):
+        cfg["reference"] = str((pdir / cfg["reference"]).resolve())
+    return cfg
+
+
+def tts_scene(scene: dict, voice: dict, bdir: Path, delay_ms: int, engine_override: str | None,
+              pdir: Path | None = None) -> SceneVoice:
     text = scene.get("narration", "").strip()
     if not text:
         return SceneVoice(None, [], 0)
+    voice = scene_voice_cfg(scene, voice, pdir or bdir.parent)
     engine = engine_override or voice.get("engine", "edge")
-    cfg = {k: voice.get(k) for k in ("voice", "rate", "pitch", "instructions")}
-    key = sha(engine, cfg, text)[:16]
+    cfg = {k: voice.get(k) for k in VOICE_KEYS}
+    if engine != voice.get("engine"):
+        cfg["voice"] = None                           # --engine override: that engine's default voice
+    ref = Path(cfg["reference"]) if cfg.get("reference") else None
+    key = sha(engine, cfg, text, ref.read_bytes() if ref and ref.exists() else b"")[:16]
     vdir = bdir / "voice"
     vdir.mkdir(parents=True, exist_ok=True)
     meta = vdir / f"{scene['id']}-{key}.json"
@@ -206,10 +227,15 @@ def tts_scene(scene: dict, voice: dict, bdir: Path, delay_ms: int, engine_overri
     else:
         res = None
     if res is None:
-        log(f"  [{scene['id']}] TTS ({engine}) {len(text)} chars")
-        res = tts.synthesize(text, vdir / f"{scene['id']}-{key}.mp3", engine, voice.get("voice") if engine == voice.get("engine") else None,
-                             voice.get("rate", "+0%"), voice.get("pitch", "+0Hz"),
-                             instructions=voice.get("instructions"))
+        style = cfg.get("style")
+        log(f"  [{scene['id']}] TTS ({engine}{', ' + style if style else ''}) {len(text)} chars")
+        res = tts.synthesize(text, vdir / f"{scene['id']}-{key}.mp3", engine, cfg["voice"],
+                             cfg.get("rate") or "+0%", cfg.get("pitch") or "+0Hz",
+                             instructions=cfg.get("instructions"), language=cfg.get("language") or "vi",
+                             style=style, pause_scale=float(cfg.get("pauseScale") or 1.0),
+                             lexicon=cfg.get("lexicon"), phrasing=cfg.get("phrasing", True) is not False,
+                             reference=cfg.get("reference"), reference_text=cfg.get("referenceText"),
+                             consent=cfg.get("confirmAuthorizedVoice") is True)
         meta.write_text(json.dumps(res.to_json(), ensure_ascii=False), encoding="utf-8")
     audio = wv.load_audio(res.audio)
     audio = np.concatenate([wv.silence(delay_ms), audio])
@@ -550,7 +576,8 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
             ids = [s["id"] for s in proj["scenes"]]
             voices = [voices[ids.index(s["id"])] for s in scenes_cfg]
     elif proj.get("voice"):
-        voices = [tts_scene(s, proj["voice"], bdir, int(scfg["voiceDelayMs"]), engine_override) for s in scenes_cfg]
+        voices = [tts_scene(s, proj["voice"], bdir, int(scfg["voiceDelayMs"]), engine_override, pdir)
+                  for s in scenes_cfg]
     else:
         voices = [SceneVoice(None, [], 0) for _ in scenes_cfg]
 
@@ -667,7 +694,7 @@ def init_project(d: Path) -> Path:
     proj = {
         "title": "Tiêu đề video",
         "formats": ["portrait", "landscape"],
-        "voice": {"engine": "edge", "voice": "vi-VN-HoaiMyNeural", "rate": "+5%"},
+        "voice": {"engine": "edge", "voice": "vi-VN-HoaiMyNeural", "style": "natural", "rate": "+5%"},
         "music": {"file": None, "volumeDb": -20},
         "scenes": [{"id": "scene-01", "svg": "scenes/scene-01.svg",
                     "narration": "Viết lời thoại của cảnh một ở đây. Mỗi phần tử có data-say sẽ được vẽ khi câu đó được đọc."}],
@@ -684,7 +711,7 @@ def main(argv=None) -> int:
     ap.add_argument("--draft", action="store_true", help="half resolution, 15 fps, fast encode")
     ap.add_argument("--scenes", default=None, help="only these scene ids (comma list)")
     ap.add_argument("--jobs", type=int, default=None, help="parallel render workers")
-    ap.add_argument("--engine", default=None, choices=["edge", "openai", "elevenlabs", "silent"],
+    ap.add_argument("--engine", default=None, choices=tts.ENGINES,
                     help="override the TTS engine (e.g. silent for offline tests)")
     ap.add_argument("--no-cache", action="store_true")
     ap.add_argument("--init", default=None, metavar="DIR", help="create a new project skeleton")

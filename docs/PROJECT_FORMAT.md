@@ -10,10 +10,14 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
   "fps": 30,
 
   "voice": {                                 // TTS theo từng cảnh (null = không đọc)
-    "engine": "edge",                        // edge (miễn phí) | elevenlabs | openai | silent
-    "voice": "vi-VN-HoaiMyNeural",           // hoặc vi-VN-NamMinhNeural
-    "rate": "+5%", "pitch": "+0Hz",
-    "instructions": null                     // openai: mô tả giọng điệu
+    "engine": "edge",                        // edge | gemini | tiktok | makevoice | elevenlabs | openai | fish | silent
+    "voice": "vi-VN-HoaiMyNeural",           // hoặc vi-VN-NamMinhNeural, Sulafat (gemini), BV074_streaming (tiktok)…
+    "style": "natural",                      // natural | news | story | podcast | ads | plain (đọc một lượt)
+    "rate": "+5%", "pitch": "+0Hz",          // cộng thêm vào phong cách (edge)
+    "pauseScale": 1.0,                       // nhân độ dài khoảng lặng tự động (0.3–3)
+    "lexicon": {"GPT": "gi pi ti"},          // cách đọc từ viết tắt / tên riêng
+    "instructions": null,                    // gemini/openai: tự mô tả giọng điệu (thay cho style)
+    "reference": null, "referenceText": null, "confirmAuthorizedVoice": false   // fish: clone giọng có sự đồng ý
   },
   "audio": null,                             // HOẶC giọng thu sẵn: {"file": "voice.mp3", "srt": "voice.srt", "words": "words.json"}
 
@@ -55,7 +59,8 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
 | `svg` | Cảnh do agent vẽ – xem [SVG_GUIDE.md](SVG_GUIDE.md). Tốt nhất. |
 | `image` + `annotation` | Ảnh raster + annotation (tạo tay / preview.html). |
 | `image` + `auto` | Tự chia vùng bằng `auto_annotate.py`. |
-| `narration` | Lời thoại của cảnh (chế độ TTS). |
+| `narration` | Lời thoại của cảnh (chế độ TTS). Có thể chèn `[pause 800ms]`, `[ngắt 1s]` – không hiện trong phụ đề. |
+| `voice` | Ghi đè giọng cho riêng cảnh này, ví dụ `{"style": "ads"}` hoặc `{"engine": "tiktok"}`. |
 | `say` | Danh sách cụm từ kích hoạt, gán lần lượt cho các phần tử chưa có `say`. |
 | `cues` | `[đầu, cuối]` (đánh số từ 1) – các câu SRT thuộc cảnh này (chế độ `audio`). |
 | `keepTiming` | `true` = giữ nguyên thời gian trong annotation, không đồng bộ theo giọng. |

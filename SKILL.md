@@ -35,6 +35,7 @@ Tạo `projects/<slug>/video.json` + `scenes/`. (Mẫu hoàn chỉnh: `examples/
 - Chia 3–6 cảnh, **mỗi cảnh một ý**, 25–60 từ/cảnh (10–20 giây). Kết bằng một câu chốt/kêu gọi.
 - Câu ngắn, văn nói tự nhiên, số viết dạng chữ số được (TTS đọc đúng). Tránh ký hiệu lạ, viết tắt.
 - Viết `narration` cho từng cảnh vào `video.json`.
+- **Chọn giọng + phong cách đọc** (mục "Giọng đọc" bên dưới): TikTok/kiến thức → `"style": "podcast"`; kể chuyện/cảm xúc → `"story"`; tin tức → `"news"`; kêu gọi hành động → `"ads"`. Có thể đặt riêng cho từng cảnh bằng `"voice": {"style": "story"}` trong cảnh. Muốn ngắt nghỉ có chủ ý (trước câu chốt) → chèn `[pause 600ms]` vào `narration`; thẻ này không hiện trong phụ đề.
 
 ### 3. Vẽ từng cảnh bằng SVG
 Đọc **docs/SVG_GUIDE.md** trước khi vẽ. Tóm tắt:
@@ -76,6 +77,10 @@ Xem `*-qa.jpg` một lần cuối, rồi báo cho người dùng: đường dẫ
 |---|---|
 | Giọng nam | `"voice": {"voice": "vi-VN-NamMinhNeural"}` |
 | Đọc nhanh hơn | `"voice": {"rate": "+10%"}` |
+| Đọc có hồn hơn | `"voice": {"style": "podcast"}` (hoặc `story` / `news` / `ads` / `natural`) |
+| Giọng hay nhất (cần key miễn phí) | `"voice": {"engine": "gemini", "voice": "Sulafat", "style": "story"}` + `GEMINI_API_KEY` |
+| Giọng TikTok quen thuộc | `"voice": {"engine": "tiktok", "voice": "BV074_streaming"}` (nữ) / `BV075_streaming` (nam) |
+| Đọc đúng từ viết tắt | `"voice": {"lexicon": {"GPT": "gi pi ti", "NASA": "na xa"}}` |
 | Nhạc nền không lo bản quyền | `"music": {"generate": "calm", "volumeDb": -24}` (hoặc `"bright"`) |
 | Nhạc nền của bạn | `"music": {"file": "music/bg.mp3", "volumeDb": -20}` |
 | TikTok full màn hình | vẽ SVG `viewBox="0 0 1080 1920"`, `"formats": ["portrait"]`; giữ nội dung ở y 150–1120, chừa y 1150–1400 cho phụ đề – xem `examples/showcase-gap-giay/` |
@@ -87,9 +92,26 @@ Xem `*-qa.jpg` một lần cuối, rồi báo cho người dùng: đường dẫ
 
 Schema đầy đủ: **docs/PROJECT_FORMAT.md**.
 
+## Giọng đọc (Voice Studio – từ ttspromax)
+
+`"style"` bật "đạo diễn giọng đọc": mỗi câu được đọc riêng với tốc độ/cao độ theo loại câu (hỏi, cảm thán, đầu/cuối đoạn), thêm dấu phẩy lấy hơi trước từ nối trong câu dài, và ghép lại với khoảng lặng chính xác theo phong cách. Mặc định `"natural"`; `"plain"` = đọc một lượt như cũ.
+
+| Engine | Giọng (`voice`) | Cần | Ghi chú |
+|---|---|---|---|
+| `edge` (mặc định) | `vi-VN-HoaiMyNeural`, `vi-VN-NamMinhNeural`, `en-US-AndrewMultilingualNeural`, `en-US-AvaMultilingualNeural`, … | không | miễn phí, timestamp thật |
+| `gemini` | `Sulafat` (ấm), `Kore`, `Aoede`, `Leda`, `Despina`, `Charon` (nam, truyền đạt), `Algieba`, `Gacrux`, `Sadaltager`, … | `GEMINI_API_KEY` | hay nhất: mô hình LLM hiểu ngữ cảnh, làm theo `style` bằng lời |
+| `tiktok` | `BV074_streaming` (Chị Vi), `BV075_streaming` (Anh Vi) | không | giọng TikTok quen tai; qua proxy công khai |
+| `makevoice` | ID giọng ElevenLabs (`pNInz6obpgDQGcFmaJgB` Adam, …) | không | endpoint không chính thức, có thể đổi |
+| `elevenlabs` / `openai` | ID giọng / `alloy`, `nova`, … | API key | `openai` nhận `style` thành `instructions` |
+| `fish` | model id trên fish.audio, hoặc clone từ `"reference"` + `"referenceText"` | `FISH_API_KEY`, `pip install fish-audio-sdk` | **chỉ clone giọng khi chính chủ đồng ý**: `"confirmAuthorizedVoice": true`; không commit file giọng mẫu |
+
+Xem cách một đoạn sẽ được đọc (không cần mạng): `$PY scripts/voice_studio.py "Lời thoại…" --style story`. Danh sách giọng: `$PY scripts/voice_studio.py x --catalogue`.
+Engine không có timestamp (gemini/tiktok/makevoice/openai/fish) được căn thời gian bằng khoảng lặng trong audio khớp với dấu câu, nên `data-say` vẫn đồng bộ tốt (sai số ~0.1s); câu ngắn, dấu câu rõ ràng giúp đồng bộ chính xác hơn.
+
 ## Xử lý sự cố
 
 - `edge-tts failed … certificate` → đặt `SSL_CERT_FILE`; không có mạng → `--engine silent` để làm nháp đúng nhịp.
+- Engine trả thiếu giọng / lỗi mạng (gemini, tiktok, makevoice) → chạy lại (có retry + cache theo cảnh), hoặc tạm `--engine edge`.
 - Phần tử không được vẽ đúng lúc → `data-say` không khớp lời thoại (xem log `-- sync`), sửa cho khớp nguyên văn.
 - Nét bị cắt / vùng sai (ảnh raster) → mở `assets/preview.html`, chỉnh vùng, lưu, chạy lại.
 - Mọi thứ được cache trong `build/`; `--no-cache` để làm lại từ đầu.
@@ -101,7 +123,8 @@ Schema đầy đủ: **docs/PROJECT_FORMAT.md**.
 | `make_video.py` | Pipeline một lệnh (dùng cái này) |
 | `svg_scene.py` | SVG → PNG + annotation có nét vector + label map |
 | `auto_annotate.py` | Ảnh raster → annotation tự động |
-| `tts.py` | TTS + timestamp từng từ (+ `--list-voices vi`) |
+| `tts.py` | TTS + timestamp từng từ, 8 engine (+ `--list-voices vi`) |
+| `voice_studio.py` | Đạo diễn giọng đọc: phong cách, ngắt nghỉ, từ điển phát âm |
 | `render_stream_whiteboard.py` | Render một cảnh (tương thích CLI cũ) |
 | `render_annotation_preview.py` | Ảnh kiểm tra vùng/thời gian |
 | `qa_frames.py` | Contact sheet + thông số video/âm thanh |

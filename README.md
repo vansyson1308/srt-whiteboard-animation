@@ -39,7 +39,7 @@ Một dự án chỉ là một file `video.json` + các cảnh:
 {
   "title": "Vì sao bầu trời màu xanh?",
   "formats": ["portrait", "landscape"],
-  "voice": { "engine": "edge", "voice": "vi-VN-NamMinhNeural", "rate": "+8%" },
+  "voice": { "engine": "edge", "voice": "vi-VN-NamMinhNeural", "style": "podcast", "rate": "+4%" },
   "scenes": [
     { "svg": "scenes/scene-01.svg", "narration": "Bạn có bao giờ tự hỏi: vì sao bầu trời lại có màu xanh? …" }
   ]
@@ -53,7 +53,7 @@ Trong SVG, mỗi nhóm `<g data-say="mặt trời">` sẽ được vẽ đúng l
 | | |
 |---|---|
 | ✍️ **Vẽ như người thật** | Cảnh SVG: bút đi theo nét vector thật, chữ được viết tay trái→phải. Ảnh raster: bút đi theo skeleton của nét, thứ tự gần-nhất để tay không nhảy. Tô màu sau khi vẽ nét. |
-| 🗣️ **Giọng đọc tiếng Việt miễn phí** | edge-tts (HoaiMy / NamMinh) có timestamp từng từ; hỗ trợ ElevenLabs, OpenAI TTS, hoặc giọng bạn tự thu + SRT. |
+| 🗣️ **Giọng đọc có hồn** | Voice Studio (từ [ttspromax](https://github.com/vansyson1308/ttspromax)): 5 phong cách đọc (tự nhiên / bản tin / kể chuyện / podcast / quảng cáo), ngữ điệu theo từng câu, ngắt nghỉ chuẩn. 8 engine: Edge (miễn phí), Gemini TTS, giọng TikTok, ElevenLabs/MakeVoice, OpenAI, Fish Audio (clone có sự đồng ý), hoặc giọng bạn tự thu + SRT. |
 | 🎯 **Nói tới đâu vẽ tới đó** | Mỗi phần tử có `say`; phần tử đầu vẽ ngay từ 0.15s (hook). |
 | 🎥 **Camera** | Zoom mượt vào phần tử đang vẽ, lùi ra toàn cảnh cuối mỗi cảnh; chuyển cảnh fade/slide. |
 | 💬 **Phụ đề karaoke** | Be Vietnam Pro, viền đậm, highlight từ đang đọc, nằm trong vùng an toàn TikTok; xuất kèm `.srt`. |
@@ -83,7 +83,8 @@ scripts/
   render_stream_whiteboard.py   renderer cảnh (mask choreography + nét liên tục + camera)
   svg_scene.py                  SVG → PNG + nét vector + label map
   auto_annotate.py              ảnh raster → annotation tự động
-  tts.py  timing.py             giọng đọc + đồng bộ theo từ
+  tts.py  voice_studio.py       giọng đọc (8 engine, phong cách đọc)
+  timing.py                     đồng bộ theo từ
   captions.py  wb_video.py      phụ đề, I/O video & âm thanh (PyAV)
   qa_frames.py  render_annotation_preview.py  brand_hand.py  generate_images.py  gen_music.py
   stream_render.py  parse_srt.py  merge_scenes.py  prepare_env.py

@@ -3,7 +3,7 @@
   "name": "gap-giay-42-lan",
   "formats": ["portrait"],
   "fps": 30,
-  "voice": { "engine": "edge", "voice": "vi-VN-HoaiMyNeural", "rate": "+6%" },
+  "voice": { "engine": "edge", "voice": "vi-VN-HoaiMyNeural", "style": "podcast", "rate": "+4%" },
   "captions": { "enabled": true, "karaoke": true, "maxWords": 5 },
   "music": { "generate": "calm", "volumeDb": -24, "duck": true, "duckDb": -8 },
   "sfx": { "pen": true, "volumeDb": -17 },
@@ -18,7 +18,7 @@
       "narration": "Gập 20 lần, nó cao hơn 100 mét, ngang một tòa nhà 30 tầng. Gập 30 lần, nó xuyên qua cả tầng khí quyển, cao hơn 100 cây số." },
     { "id": "scene-04", "svg": "scenes/scene-04.svg",
       "narration": "Đến lần gập thứ 42, độ dày đạt khoảng 440 nghìn cây số, vượt qua khoảng cách từ Trái Đất tới Mặt Trăng. Đó là sức mạnh của tăng trưởng lũy thừa: mỗi bước chỉ là nhân đôi." },
-    { "id": "scene-05", "svg": "scenes/scene-05.svg",
-      "narration": "Điều này cũng đúng với chính bạn. Mỗi ngày giỏi hơn 1%, sau một năm bạn giỏi gấp 37 lần. Mỗi ngày tệ đi 1%, bạn gần như chỉ còn con số 0. Hãy bắt đầu gập tờ giấy của mình, ngay từ hôm nay." }
+    { "id": "scene-05", "svg": "scenes/scene-05.svg", "voice": { "style": "story", "rate": "+6%" },
+      "narration": "Điều này cũng đúng với chính bạn. Mỗi ngày giỏi hơn 1%, sau một năm bạn giỏi gấp 37 lần. Mỗi ngày tệ đi 1%, bạn gần như chỉ còn con số 0. [pause 500ms] Hãy bắt đầu gập tờ giấy của mình, ngay từ hôm nay." }
   ]
 }
