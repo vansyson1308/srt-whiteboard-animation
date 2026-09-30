@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 6: nên làm gì - sức mua, lãi suất thực, lớn nhanh hơn lạm phát -->
+  <g id="what" data-label="Làm gì?" data-say="nên làm gì">
+    <text x="540" y="210" text-anchor="middle" font-family="Patrick Hand" font-size="110" fill="#2b2b2b">Làm gì bây giờ?</text>
+  </g>
+  <g id="cart" data-label="Mua được bao nhiêu" data-say="mua được bao nhiêu">
+    <path d="M110 320 L 160 320 L 200 470 L 350 470 L 380 370 L 175 370" fill="none" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="215" cy="510" r="18" fill="#ffffff" stroke="#2b2b2b" stroke-width="6"/>
+    <circle cx="330" cy="510" r="18" fill="#ffffff" stroke="#2b2b2b" stroke-width="6"/>
+    <text x="410" y="450" font-family="Patrick Hand" font-size="62" fill="#3b7dd8">mua được bao nhiêu?</text>
+  </g>
+  <g id="bars" data-label="Lãi 3% vs lạm phát 4%" data-say="lãi 3%">
+    <path d="M140 900 L 620 900" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>
+    <rect x="190" y="720" width="140" height="180" fill="#5aa469" stroke="#2b2b2b" stroke-width="6"/>
+    <rect x="410" y="660" width="140" height="240" fill="#e04b3a" stroke="#2b2b2b" stroke-width="6"/>
+    <text x="260" y="700" text-anchor="middle" font-family="Patrick Hand" font-size="60" fill="#5aa469">3%</text>
+    <text x="480" y="640" text-anchor="middle" font-family="Patrick Hand" font-size="60" fill="#e04b3a">4%</text>
+    <text x="260" y="960" text-anchor="middle" font-family="Patrick Hand" font-size="48" fill="#2b2b2b">lãi</text>
+    <text x="480" y="960" text-anchor="middle" font-family="Patrick Hand" font-size="48" fill="#2b2b2b">lạm phát</text>
+  </g>
+  <g id="poorer" data-label="Nghèo đi 1%" data-say="nghèo đi">
+    <text x="820" y="740" text-anchor="middle" font-family="Patrick Hand" font-size="96" fill="#e04b3a">−1%</text>
+    <text x="820" y="810" text-anchor="middle" font-family="Patrick Hand" font-size="50" fill="#e04b3a">mỗi năm</text>
+    <path d="M820 840 L 820 920 M798 898 L 820 922 L 842 898" fill="none" stroke="#e04b3a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="grow" data-label="Lớn nhanh hơn lạm phát" data-say="lớn nhanh hơn">
+    <path d="M140 1100 L 250 990 M200 988 L 252 988 L 252 1040" fill="none" stroke="#e8743b" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="300" y="1035" font-family="Patrick Hand" font-size="66" fill="#2b2b2b">Tiền + kỹ năng</text>
+    <text x="300" y="1105" font-family="Patrick Hand" font-size="66" fill="#e8743b">&gt; lạm phát!</text>
+  </g>
+</svg>

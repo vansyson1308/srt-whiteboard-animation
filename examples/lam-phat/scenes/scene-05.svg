@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 5: đồng hồ lạm phát - giảm giá nguy hiểm, mục tiêu ~2%, Zimbabwe phi mã -->
+  <g id="gauge" data-label="Đồng hồ lạm phát" data-say="giá giảm">
+    <path d="M180 620 A 360 360 0 0 1 228 440" fill="none" stroke="#3b7dd8" stroke-width="44"/>
+    <path d="M228 440 A 360 360 0 0 1 417 282" fill="none" stroke="#5aa469" stroke-width="44"/>
+    <path d="M417 282 A 360 360 0 0 1 720 308" fill="none" stroke="#f6c453" stroke-width="44"/>
+    <path d="M720 308 A 360 360 0 0 1 900 620" fill="none" stroke="#e04b3a" stroke-width="44"/>
+    <text x="190" y="700" text-anchor="middle" font-family="Patrick Hand" font-size="50" fill="#3b7dd8">giảm giá</text>
+    <text x="890" y="700" text-anchor="middle" font-family="Patrick Hand" font-size="50" fill="#e04b3a">phi mã</text>
+  </g>
+  <g id="target" data-label="Mục tiêu 2%" data-say="2%">
+    <path d="M540 620 L 350 392" fill="none" stroke="#2b2b2b" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="540" cy="620" r="24" fill="#2b2b2b"/>
+    <text x="660" y="540" text-anchor="middle" font-family="Patrick Hand" font-size="96" fill="#5aa469">≈ 2%</text>
+  </g>
+  <g id="zimbabwe" data-label="Tờ 100 nghìn tỷ Zimbabwe" data-say="Zimbabwe">
+    <rect x="90" y="770" width="900" height="180" rx="14" fill="#eaf6e8" stroke="#2b2b2b" stroke-width="6"/>
+    <rect x="110" y="790" width="860" height="140" rx="8" fill="none" stroke="#5aa469" stroke-width="3"/>
+    <text x="540" y="835" text-anchor="middle" font-family="Patrick Hand" font-size="38" fill="#5aa469">ZIMBABWE $</text>
+    <text x="540" y="910" text-anchor="middle" font-family="Patrick Hand" font-size="72" fill="#2b2b2b">100 000 000 000 000</text>
+  </g>
+  <g id="double" data-label="Gấp đôi mỗi ngày" data-say="gấp đôi">
+    <text x="540" y="1070" text-anchor="middle" font-family="Patrick Hand" font-size="92" fill="#e04b3a">giá ×2 mỗi ngày!</text>
+  </g>
+</svg>

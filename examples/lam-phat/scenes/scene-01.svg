@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 1: hook - tên trộm vô hình lấy sức mua của tiền -->
+  <g id="title" data-label="Tên trộm vô hình" data-say="tên trộm">
+    <text x="540" y="210" text-anchor="middle" font-family="Patrick Hand" font-size="100" fill="#2b2b2b">Tên trộm vô hình?</text>
+    <path d="M190 250 C 400 234, 680 234, 890 250" fill="none" stroke="#e8743b" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <g id="wallet" data-label="Chiếc ví" data-say="mở ví">
+    <rect x="120" y="330" width="340" height="210" rx="28" fill="#f6c453" stroke="#2b2b2b" stroke-width="7"/>
+    <path d="M120 390 L 460 390" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round"/>
+    <rect x="390" y="410" width="100" height="70" rx="16" fill="#e8743b" stroke="#2b2b2b" stroke-width="6"/>
+    <circle cx="425" cy="445" r="10" fill="#ffffff" stroke="#2b2b2b" stroke-width="4"/>
+    <path d="M470 560 C 490 600, 520 630, 560 650" fill="none" stroke="#9a9a9a" stroke-width="4" stroke-dasharray="10 12" stroke-linecap="round"/>
+    <circle cx="500" cy="590" r="18" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+    <circle cx="545" cy="632" r="14" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+    <circle cx="580" cy="662" r="10" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+  </g>
+  <g id="note" data-label="Tờ 100 nghìn" data-say="100 nghìn">
+    <rect x="560" y="330" width="400" height="210" rx="14" fill="#dfeefe" stroke="#2b2b2b" stroke-width="6"/>
+    <rect x="582" y="352" width="356" height="166" rx="8" fill="none" stroke="#3b7dd8" stroke-width="3"/>
+    <circle cx="655" cy="435" r="46" fill="#ffffff" stroke="#3b7dd8" stroke-width="4"/>
+    <text x="835" y="458" text-anchor="middle" font-family="Patrick Hand" font-size="62" fill="#2b2b2b">100.000đ</text>
+  </g>
+  <g id="bags" data-label="Năm nay vs năm sau" data-say="năm sau">
+    <circle cx="225" cy="800" r="34" fill="#e04b3a" stroke="#2b2b2b" stroke-width="5"/>
+    <circle cx="300" cy="780" r="40" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <circle cx="372" cy="802" r="32" fill="#5aa469" stroke="#2b2b2b" stroke-width="5"/>
+    <rect x="250" y="735" width="26" height="80" rx="8" fill="#dfeefe" stroke="#2b2b2b" stroke-width="5"/>
+    <path d="M160 825 L 440 825 L 418 1040 L 182 1040 Z" fill="#ffffff" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M230 825 C 230 770, 370 770, 370 825" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>
+    <text x="300" y="1100" text-anchor="middle" font-family="Patrick Hand" font-size="58" fill="#2b2b2b">Năm nay</text>
+    <path d="M475 930 L 595 930 M575 912 L 598 930 L 575 948" fill="none" stroke="#3b7dd8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="780" cy="812" r="22" fill="#e04b3a" stroke="#2b2b2b" stroke-width="5"/>
+    <path d="M640 825 L 920 825 L 898 1040 L 662 1040 Z" fill="#ffffff" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M710 825 C 710 770, 850 770, 850 825" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>
+    <text x="780" y="1100" text-anchor="middle" font-family="Patrick Hand" font-size="58" fill="#e04b3a">Năm sau</text>
+  </g>
+  <g id="inflation" data-label="Lạm phát" data-say="lạm phát">
+    <rect x="640" y="590" width="330" height="110" rx="18" fill="#ffffff" stroke="#e04b3a" stroke-width="7"/>
+    <text x="805" y="670" text-anchor="middle" font-family="Patrick Hand" font-size="76" fill="#e04b3a">LẠM PHÁT</text>
+  </g>
+</svg>

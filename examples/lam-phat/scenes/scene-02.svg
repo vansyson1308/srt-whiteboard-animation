@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 2: hòn đảo 10 bao gạo + 100 xu; in thêm 100 xu -> giá gấp đôi -->
+  <g id="island" data-label="Hòn đảo" data-say="hòn đảo">
+    <path d="M150 470 C 250 380, 830 380, 930 470 Z" fill="#f6c453" stroke="#2b2b2b" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M760 430 C 770 360, 790 300, 830 240" fill="none" stroke="#8a5a2b" stroke-width="16" stroke-linecap="round"/>
+    <path d="M830 240 C 770 200, 720 215, 690 250 C 740 240, 780 245, 830 240 Z" fill="#5aa469" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M830 240 C 880 195, 940 205, 965 245 C 920 235, 875 238, 830 240 Z" fill="#5aa469" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M830 240 C 820 185, 850 150, 890 140 C 865 175, 850 205, 830 240 Z" fill="#5aa469" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M110 510 C 150 490, 190 530, 230 510 C 270 490, 310 530, 350 510 M730 510 C 770 490, 810 530, 850 510 C 890 490, 930 530, 970 510" fill="none" stroke="#3b7dd8" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <g id="rice" data-label="10 bao gạo" data-say="10 bao gạo">
+    <path d="M120 625 Q 152 600 184 625 L 180 700 L 124 700 Z M196 625 Q 228 600 260 625 L 256 700 L 200 700 Z M272 625 Q 304 600 336 625 L 332 700 L 276 700 Z M348 625 Q 380 600 412 625 L 408 700 L 352 700 Z M424 625 Q 456 600 488 625 L 484 700 L 428 700 Z" fill="#fff7e0" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M120 735 Q 152 710 184 735 L 180 810 L 124 810 Z M196 735 Q 228 710 260 735 L 256 810 L 200 810 Z M272 735 Q 304 710 336 735 L 332 810 L 276 810 Z M348 735 Q 380 710 412 735 L 408 810 L 352 810 Z M424 735 Q 456 710 488 735 L 484 810 L 428 810 Z" fill="#fff7e0" stroke="#2b2b2b" stroke-width="5" stroke-linejoin="round"/>
+    <text x="304" y="875" text-anchor="middle" font-family="Patrick Hand" font-size="60" fill="#2b2b2b">10 bao gạo</text>
+  </g>
+  <g id="coins" data-label="100 xu" data-say="100 đồng xu">
+    <ellipse cx="680" cy="790" rx="48" ry="16" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <ellipse cx="680" cy="770" rx="48" ry="16" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <ellipse cx="680" cy="750" rx="48" ry="16" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <ellipse cx="790" cy="790" rx="48" ry="16" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <ellipse cx="790" cy="770" rx="48" ry="16" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <ellipse cx="790" cy="750" rx="48" ry="16" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <ellipse cx="790" cy="730" rx="48" ry="16" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <ellipse cx="900" cy="790" rx="48" ry="16" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <ellipse cx="900" cy="770" rx="48" ry="16" fill="#f6c453" stroke="#2b2b2b" stroke-width="5"/>
+    <text x="790" y="875" text-anchor="middle" font-family="Patrick Hand" font-size="60" fill="#2b2b2b">100 xu</text>
+  </g>
+  <g id="price1" data-label="Giá 10 xu" data-say="10 xu">
+    <path d="M120 925 L 440 925 L 490 965 L 440 1005 L 120 1005 Z" fill="#eef5fb" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <circle cx="445" cy="965" r="9" fill="#ffffff" stroke="#2b2b2b" stroke-width="4"/>
+    <text x="140" y="985" font-family="Patrick Hand" font-size="56" fill="#2b2b2b">1 bao = 10 xu</text>
+  </g>
+  <g id="printer" data-label="In thêm tiền" data-say="in thêm">
+    <rect x="700" y="905" width="150" height="34" rx="6" fill="#ffffff" stroke="#2b2b2b" stroke-width="5"/>
+    <rect x="650" y="935" width="250" height="90" rx="14" fill="#dfeefe" stroke="#2b2b2b" stroke-width="6"/>
+    <circle cx="865" cy="962" r="8" fill="#e04b3a"/>
+    <circle cx="940" cy="1000" r="16" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+    <circle cx="975" cy="970" r="13" fill="#f6c453" stroke="#2b2b2b" stroke-width="4"/>
+    <text x="775" y="1090" text-anchor="middle" font-family="Patrick Hand" font-size="60" fill="#e04b3a">+100 xu</text>
+  </g>
+  <g id="price2" data-label="Giá 20 xu" data-say="20 xu">
+    <path d="M120 1035 L 440 1035 L 490 1075 L 440 1115 L 120 1115 Z" fill="#fde4df" stroke="#e04b3a" stroke-width="6" stroke-linejoin="round"/>
+    <circle cx="445" cy="1075" r="9" fill="#ffffff" stroke="#e04b3a" stroke-width="4"/>
+    <text x="140" y="1095" font-family="Patrick Hand" font-size="56" fill="#e04b3a">1 bao = 20 xu</text>
+    <path d="M540 1110 L 540 1040 M518 1062 L 540 1038 L 562 1062" fill="none" stroke="#e04b3a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
