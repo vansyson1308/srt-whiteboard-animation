@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 4: 42 lần = 440.000 km > khoảng cách Trái Đất - Mặt Trăng -->
+  <g id="earth" data-label="Trái Đất" data-say="Trái Đất">
+    <circle cx="260" cy="970" r="130" fill="#dfeefe" stroke="#2b2b2b" stroke-width="6"/>
+    <path d="M180 900 q 40 -30 80 0 q 30 30 -10 60 q -40 20 -70 -20 z M270 1000 q 40 -20 70 10 q 10 40 -40 50 q -40 -10 -30 -60 z" fill="#8fc98f" stroke="#2b2b2b" stroke-width="4" stroke-linejoin="round"/>
+  </g>
+  <g id="tower" data-label="Chồng giấy 42 lần" data-say="440 nghìn">
+    <path d="M260 835 L 260 245" fill="none" stroke="#e8743b" stroke-width="16" stroke-linecap="round"/>
+    <path d="M240 700 L 280 700 M240 580 L 280 580 M240 460 L 280 460 M240 340 L 280 340" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>
+    <text x="80" y="205" font-family="Patrick Hand" font-size="84" fill="#2b2b2b">42 lần ≈ 440.000 km</text>
+  </g>
+  <g id="distance" data-label="Khoảng cách tới Mặt Trăng" data-say="khoảng cách">
+    <path d="M385 900 L 700 430" fill="none" stroke="#3b7dd8" stroke-width="7" stroke-linecap="round" stroke-dasharray="20 14"/>
+    <path d="M376 862 L 385 902 L 422 884 M 663 448 L 702 428 L 704 470" fill="none" stroke="#3b7dd8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="580" y="760" font-family="Patrick Hand" font-size="64" fill="#3b7dd8">384.400 km</text>
+  </g>
+  <g id="moon" data-label="Mặt Trăng" data-say="Mặt Trăng">
+    <circle cx="790" cy="340" r="100" fill="#f1efe6" stroke="#2b2b2b" stroke-width="6"/>
+    <circle cx="760" cy="310" r="20" fill="none" stroke="#9a9a9a" stroke-width="5"/>
+    <circle cx="825" cy="375" r="26" fill="none" stroke="#9a9a9a" stroke-width="5"/>
+  </g>
+  <g id="power" data-label="Tăng trưởng lũy thừa" data-say="lũy thừa">
+    <text x="480" y="990" font-family="Patrick Hand" font-size="70" fill="#2b2b2b">Tăng trưởng</text>
+    <text x="480" y="1075" font-family="Patrick Hand" font-size="70" fill="#e04b3a">lũy thừa!</text>
+    <path d="M480 1095 C 600 1108, 740 1104, 800 1090" fill="none" stroke="#e04b3a" stroke-width="7" stroke-linecap="round"/>
+  </g>
+</svg>

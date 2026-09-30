@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 1: HOOK - gập giấy 42 lần chạm tới Mặt Trăng? -->
+  <g id="title" data-label="Tiêu đề" data-say="gập đôi">
+    <text x="540" y="290" text-anchor="middle" font-family="Patrick Hand" font-size="118" fill="#2b2b2b">Gập giấy 42 lần</text>
+    <path d="M190 330 C 400 352, 690 350, 890 326" fill="none" stroke="#e8743b" stroke-width="9" stroke-linecap="round"/>
+  </g>
+  <g id="paper" data-label="Tờ giấy" data-say="tờ giấy">
+    <path d="M110 930 L 360 870 L 470 1010 L 220 1075 Z" fill="#ffffff" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M235 900 L 345 1042" fill="none" stroke="#9a9a9a" stroke-width="4" stroke-dasharray="14 10" stroke-linecap="round"/>
+    <path d="M150 860 C 170 790, 280 770, 330 820" fill="none" stroke="#3b7dd8" stroke-width="6" stroke-linecap="round"/>
+    <path d="M300 800 L 333 822 L 296 836" fill="none" stroke="#3b7dd8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="moon" data-label="Mặt Trăng" data-say="Mặt Trăng">
+    <circle cx="790" cy="560" r="115" fill="#f1efe6" stroke="#2b2b2b" stroke-width="6"/>
+    <circle cx="755" cy="520" r="22" fill="none" stroke="#9a9a9a" stroke-width="5"/>
+    <circle cx="830" cy="600" r="30" fill="none" stroke="#9a9a9a" stroke-width="5"/>
+    <circle cx="760" cy="620" r="12" fill="none" stroke="#9a9a9a" stroke-width="4"/>
+    <path d="M655 410 l 0 -44 M633 388 l 44 0 M940 470 l 0 -30 M925 455 l 30 0" fill="none" stroke="#f6c453" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <g id="reach" data-label="Mũi tên chạm tới" data-say="chạm tới">
+    <path d="M400 860 C 470 700, 560 640, 670 610" fill="none" stroke="#e8743b" stroke-width="8" stroke-linecap="round" stroke-dasharray="22 16"/>
+    <path d="M636 588 L 675 609 L 640 640" fill="none" stroke="#e8743b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="wow" data-label="Vô lý?!" data-say="vô lý">
+    <text x="720" y="930" font-family="Patrick Hand" font-size="150" fill="#e04b3a">?!</text>
+  </g>
+  <g id="math" data-label="Công thức" data-say="toán học">
+    <text x="540" y="1110" text-anchor="middle" font-family="Patrick Hand" font-size="74" fill="#2b2b2b">0,1 mm × 2<tspan baseline-shift="super" font-size="48">42</tspan> = ?</text>
+  </g>
+</svg>

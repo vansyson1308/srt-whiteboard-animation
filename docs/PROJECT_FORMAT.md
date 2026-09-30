@@ -10,10 +10,14 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
   "fps": 30,
 
   "voice": {                                 // TTS theo từng cảnh (null = không đọc)
-    "engine": "edge",                        // edge (miễn phí) | elevenlabs | openai | silent
-    "voice": "vi-VN-HoaiMyNeural",           // hoặc vi-VN-NamMinhNeural
-    "rate": "+5%", "pitch": "+0Hz",
-    "instructions": null                     // openai: mô tả giọng điệu
+    "engine": "edge",                        // edge | gemini | tiktok | makevoice | elevenlabs | openai | fish | silent
+    "voice": "vi-VN-HoaiMyNeural",           // hoặc vi-VN-NamMinhNeural, Sulafat (gemini), BV074_streaming (tiktok)…
+    "style": "natural",                      // natural | news | story | podcast | ads | plain (đọc một lượt)
+    "rate": "+5%", "pitch": "+0Hz",          // cộng thêm vào phong cách (edge)
+    "pauseScale": 1.0,                       // nhân độ dài khoảng lặng tự động (0.3–3)
+    "lexicon": {"GPT": "gi pi ti"},          // cách đọc từ viết tắt / tên riêng
+    "instructions": null,                    // gemini/openai: tự mô tả giọng điệu (thay cho style)
+    "reference": null, "referenceText": null, "confirmAuthorizedVoice": false   // fish: clone giọng có sự đồng ý
   },
   "audio": null,                             // HOẶC giọng thu sẵn: {"file": "voice.mp3", "srt": "voice.srt", "words": "words.json"}
 
@@ -21,6 +25,7 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
                 "box": false, "highlight": "#FFD60A", "size": 0 },
   "header": { "text": "Tiêu đề hiện ở bản dọc" },   // false để tắt; mặc định = title
   "music":  { "file": "music/nhac-nen.mp3", "volumeDb": -20, "duck": true, "duckDb": -8 },
+                                             // hoặc {"generate": "calm"|"bright"} = nhạc tự tạo, không bản quyền
   "sfx":    { "pen": true, "volumeDb": -17 },       // tiếng bút sột soạt khi đang vẽ
   "render": { "inkPath": "skeleton", "colorFill": "contour-wipe", "camera": "follow",
               "cameraMaxZoom": 1.2, "paper": "#F6F1E3", "hand": null, "handHeightRatio": 0.42 },
@@ -54,7 +59,8 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
 | `svg` | Cảnh do agent vẽ – xem [SVG_GUIDE.md](SVG_GUIDE.md). Tốt nhất. |
 | `image` + `annotation` | Ảnh raster + annotation (tạo tay / preview.html). |
 | `image` + `auto` | Tự chia vùng bằng `auto_annotate.py`. |
-| `narration` | Lời thoại của cảnh (chế độ TTS). |
+| `narration` | Lời thoại của cảnh (chế độ TTS). Có thể chèn `[pause 800ms]`, `[ngắt 1s]` – không hiện trong phụ đề. |
+| `voice` | Ghi đè giọng cho riêng cảnh này, ví dụ `{"style": "ads"}` hoặc `{"engine": "tiktok"}`. |
 | `say` | Danh sách cụm từ kích hoạt, gán lần lượt cho các phần tử chưa có `say`. |
 | `cues` | `[đầu, cuối]` (đánh số từ 1) – các câu SRT thuộc cảnh này (chế độ `audio`). |
 | `keepTiming` | `true` = giữ nguyên thời gian trong annotation, không đồng bộ theo giọng. |

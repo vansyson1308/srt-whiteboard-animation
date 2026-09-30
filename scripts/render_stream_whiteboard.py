@@ -68,7 +68,7 @@ class RenderOptions:
     match_bg: bool = True               # repaint the image background with paper_hex
     match_bg_threshold: int = 28
     hand: str | None = str(DEFAULT_HAND)
-    hand_height_ratio: float = 0.42     # hand height relative to frame height
+    hand_height_ratio: float = 0.42     # hand height relative to the frame's short side
     tip_anchor: tuple[float, float] = (0.0, 0.0)
     hand_motion: bool = True            # hand slides in/out between elements
     camera: str = "none"                # none | follow
@@ -257,7 +257,7 @@ class SceneRenderer:
 
         self.hand: Hand | None = None
         if not bare_tip and opts.hand is not None:
-            self.hand = Hand(opts.hand, int(round(H * opts.hand_height_ratio)), opts.tip_anchor)
+            self.hand = Hand(opts.hand, int(round(min(W, H) * opts.hand_height_ratio)), opts.tip_anchor)
         self.cam = np.array([W / 2, H / 2, 1.0], dtype=np.float64)  # cx, cy, zoom
         self._cam_plan = None   # explicit per-frame camera states (outro zoom-out)
         self.frames_written = 0
@@ -437,6 +437,10 @@ class SceneRenderer:
 
     # ── phases ──
     def _hand_rest(self) -> tuple[float, float]:
+        """Off-screen parking spot for the hand (its tip is the top-left of the hand image)."""
+        if self.H > self.W * 1.2:
+            # tall frames: leave sideways so the hand never sweeps through the caption band
+            return (self.W + 30, self.H * 0.42)
         return (self.W * 0.78, self.H * 1.08)   # tip below the frame -> hand fully off-screen
 
     def _gap(self, sink, n: int, start_xy, end_xy, cam_target=None) -> None:
@@ -469,8 +473,8 @@ class SceneRenderer:
                 xy = (rest[0] + (end_xy[0] - rest[0]) * t, rest[1] + (end_xy[1] - rest[1]) * t)
             else:
                 xy = None
-            if xy is not None and xy[1] >= self.H + self.hand.h:
-                xy = None
+            if xy is not None and (xy[0] >= self.W or xy[1] >= self.H):
+                xy = None   # tip outside the frame: the whole hand is off-screen
             self._emit(sink, xy, cam_target)
 
     def _ink_phase(self, sink, frames: int, pts, draw, radius, mask, cam_target) -> tuple | None:

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <!-- Cảnh 2: mỏng 0,1 mm, mỗi lần gập nhân đôi, 10 lần = cuốn sách -->
+  <g id="thin" data-label="Giấy rất mỏng" data-say="rất mỏng">
+    <path d="M110 330 L 520 330" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="640" cy="300" r="120" fill="#eef5fb" stroke="#2b2b2b" stroke-width="7"/>
+    <path d="M725 385 L 830 490" fill="none" stroke="#2b2b2b" stroke-width="18" stroke-linecap="round"/>
+    <path d="M560 300 L 720 300" fill="none" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"/>
+    <path d="M640 250 L 640 282 M 640 318 L 640 350 M628 262 L640 282 L652 262 M628 338 L640 318 L652 338" fill="none" stroke="#e04b3a" stroke-width="4" stroke-linecap="round"/>
+    <text x="130" y="275" font-family="Patrick Hand" font-size="84" fill="#e04b3a">0,1 mm</text>
+  </g>
+  <g id="double" data-label="Mỗi lần gập ×2" data-say="Mỗi lần gập">
+    <rect x="120" y="650" width="150" height="14" rx="3" fill="#ffffff" stroke="#2b2b2b" stroke-width="5"/>
+    <path d="M300 657 L 360 657 M345 645 L362 657 L345 669" fill="none" stroke="#3b7dd8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="390" y="636" width="150" height="14" rx="3" fill="#ffffff" stroke="#2b2b2b" stroke-width="5"/>
+    <rect x="390" y="650" width="150" height="14" rx="3" fill="#ffffff" stroke="#2b2b2b" stroke-width="5"/>
+    <path d="M570 657 L 630 657 M615 645 L632 657 L615 669" fill="none" stroke="#3b7dd8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="660" y="608" width="150" height="14" rx="3" fill="#ffffff" stroke="#2b2b2b" stroke-width="5"/>
+    <rect x="660" y="622" width="150" height="14" rx="3" fill="#ffffff" stroke="#2b2b2b" stroke-width="5"/>
+    <rect x="660" y="636" width="150" height="14" rx="3" fill="#ffffff" stroke="#2b2b2b" stroke-width="5"/>
+    <rect x="660" y="650" width="150" height="14" rx="3" fill="#ffffff" stroke="#2b2b2b" stroke-width="5"/>
+    <text x="300" y="770" font-family="Patrick Hand" font-size="70" fill="#3b7dd8">×2 … ×2 … ×2</text>
+  </g>
+  <g id="ten" data-label="Gập 10 lần" data-say="Gập 10 lần">
+    <text x="500" y="930" font-family="Patrick Hand" font-size="88" fill="#2b2b2b">10 lần</text>
+    <text x="500" y="1035" font-family="Patrick Hand" font-size="80" fill="#e8743b">≈ 10 cm</text>
+  </g>
+  <g id="book" data-label="Cuốn sách" data-say="cuốn sách">
+    <path d="M110 900 L 350 860 L 440 905 L 200 945 Z" fill="#f6c453" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M110 900 L 200 945 L 200 1015 L 110 970 Z" fill="#e8743b" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M200 945 L 440 905 L 440 975 L 200 1015 Z" fill="#ffffff" stroke="#2b2b2b" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M210 961 L 432 924 M210 978 L 432 941 M210 995 L 432 958" fill="none" stroke="#9a9a9a" stroke-width="3" stroke-linecap="round"/>
+    <path d="M250 900 C 290 888, 330 882, 380 885" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>
