@@ -20,6 +20,8 @@ Claude Code / Codex không cần API tạo ảnh: agent **tự viết SVG**, `sv
 - `data-label` = tên dễ đọc (hiện trong preview/QA). `data-role` tuỳ chọn.
 - Bên trong nhóm, thứ tự các shape = thứ tự nét. Chữ `<text>` được "viết tay" từ trái sang phải.
 - Không vẽ hình chữ nhật nền phủ toàn khung (nếu có, nó được dùng làm màu giấy và bị loại bỏ).
+- `data-filler="1"` = hình trang trí **không gắn với lời thoại** (bóng đèn, ngôi sao, mũi tên nhỏ, gạch chân phụ…). Không có `data-say`. Renderer tự vẽ nó vào khoảng nghỉ dài nhất mà lẽ ra bàn tay phải đứng chờ; nếu không có khoảng nghỉ đủ dài nó hiện dần ở cuối cảnh.
+- `data-color="none|fade|contour-wipe|brush"` = cách tô màu riêng cho nhóm. Chữ và nét không có mảng màu thì tự bỏ qua bước tô (tay không quét qua lại vô ích).
 
 ## Khung hình
 
@@ -45,6 +47,7 @@ Claude Code / Codex không cần API tạo ảnh: agent **tự viết SVG**, `sv
 - 1 cảnh ≈ 10–20 giây lời thoại; video TikTok 30–60 giây ≈ 3–5 cảnh.
 - Mũi tên, gạch chân, khoanh tròn là các phần tử riêng → được vẽ đúng lúc nhấn mạnh.
 - Mỗi `data-say` nên là 1–3 từ đặc trưng, xuất hiện một lần trong lời thoại của cảnh.
+- Bàn tay vẽ đúng tốc độ tự nhiên rồi **rút ra khỏi khung** khi chưa tới phần tử kế tiếp. Cảnh nói dài mà ít hình thì khung sẽ trống lâu: thêm phần tử có `data-say`, hoặc 1–2 hình `data-filler` để lấp khoảng nghỉ.
 
 ## Kiểm tra nhanh
 

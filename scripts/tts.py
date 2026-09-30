@@ -809,6 +809,9 @@ def _speech_span(audio_path: Path) -> tuple[int, int, int]:
 # One request per sentence: exact sentence boundaries + planned pauses (the timing of
 # engines without timestamps then only has to be estimated inside one sentence).
 SENTENCE_ENGINES = {"edge", "tiktok", "gemini", "vieneu"}
+# engines without prosody controls: moods are applied to the audio (tempo/pitch/gain)
+PROSODY_DSP_ENGINES = {"vieneu", "tiktok", "makevoice", "fish"}
+PROSODY_VERSION = 1          # bump when mood planning / DSP changes (invalidates voice caches)
 BLOCK_CHARS = {"gemini": 1500, "openai": 1500, "makevoice": 1500, "fish": 1500, "vieneu": 600}
 PARALLEL = {"edge": 4, "tiktok": 3, "gemini": 3, "openai": 3, "makevoice": 2, "fish": 2, "vieneu": 1}
 
@@ -818,11 +821,19 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
                instructions: str | None = None, language: str | None = "vi",
                style: str | None = None, pause_scale: float = 1.0, lexicon: dict | list | None = None,
                phrasing: bool = True, reference: str | None = None, reference_text: str | None = None,
-               consent: bool = False, chunk: str | None = None) -> TTSResult:
+               consent: bool = False, chunk: str | None = None, mood: str | None = None,
+               expressiveness: float = 1.0, auto_mood: bool = True) -> TTSResult:
     """Speak ``text`` into ``out``.  ``style`` (natural/news/story/podcast/ads) turns on the
     Voice Studio: per-sentence prosody + planned pauses (edge/tiktok/vieneu) or a style
     direction (gemini/openai).  ``style=None`` or "plain" keeps a single request (edge/openai).
-    ``chunk`` = "sentence" | "paragraph" overrides how the text is split into requests."""
+    ``chunk`` = "sentence" | "paragraph" overrides how the text is split into requests.
+
+    Moods (content-aware delivery): each sentence gets a mood - from a ``[cao trào]``-style
+    tag, the scene ``mood``, or read from its words (``auto_mood``) - that sets its tempo,
+    pitch, loudness and the pauses around it, scaled by ``expressiveness`` (0 = flat).
+    Edge plays them through SSML prosody; engines without prosody controls (vieneu, tiktok,
+    makevoice, fish) are re-timed and re-pitched per sentence (WSOLA); gemini/openai get a
+    spoken direction per sentence."""
     import wb_video
     if engine not in ENGINES:
         raise ValueError(f"unknown TTS engine: {engine} (choose from {', '.join(ENGINES)})")
@@ -861,7 +872,8 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
     plan = vs.plan_script(text, style or "natural",
                           rate if engine == "edge" else 0, pitch if engine == "edge" else 0,
                           pause_scale, phrasing=phrasing and per_sentence, lexicon=lexicon,
-                          lang=language if language in ("vi", "en") else None)
+                          lang=language if language in ("vi", "en") else None, mood=mood,
+                          expressiveness=expressiveness, auto_mood=auto_mood)
     if not plan.segments:
         raise ValueError("no speakable text")
     if per_sentence:
@@ -877,21 +889,26 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
         spoken = " ".join(s.spoken for s in segs)
         disp = " ".join(s.display for s in segs)
         part = tmp / f"{k:03d}"
+        same = all(s.mood == segs[0].mood for s in segs)      # one feeling for the whole request
+        s0 = segs[0]
         if engine == "edge":
-            s = segs[0]
             f = part.with_suffix(".mp3")
-            sw = _edge(spoken, f, voice, vs.format_rate(s.rate), vs.format_pitch(s.pitch), volume)
+            sw = _edge(spoken, f, voice, vs.format_rate(s0.rate), vs.format_pitch(s0.pitch), volume)
             pcm = wb_video.load_audio(f, stereo=False)
             f.unlink(missing_ok=True)
+            pcm = wb_video.apply_prosody(pcm, gain_db=s0.gain_db, ramp_db=s0.ramp_db)   # tempo/pitch: SSML
             words = align_to_text(disp, sw) if sw else anchor_words(disp, pcm)
-            return Clip(pcm, words, segs[0].pause_before_ms)
+            return Clip(pcm, words, s0.pause_before_ms)
+        say = direct
+        if same and s0.mood != "neutral" and s0.intensity >= 0.5:
+            say = f"{direct} {vs.MOODS[s0.mood]['direction']}"
         if engine == "tiktok":
             import numpy as np
             chunks = vs.split_long_sentence(spoken, 280)       # the proxy takes <= 300 chars
             pcm = np.concatenate([_decode(_tiktok(c, voice), ".mp3", part.with_name(f"{k:03d}-{i}"))
                                   for i, c in enumerate(chunks)])
         elif engine == "gemini":
-            pcm = _decode(_gemini(spoken, voice, direct), ".wav", part)
+            pcm = _decode(_gemini(spoken, voice, say), ".wav", part)
         elif engine == "makevoice":
             pcm = _decode(_makevoice(spoken, voice, language), ".mp3", part)
         elif engine == "fish":
@@ -900,10 +917,12 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
             pcm = _vieneu(spoken, voice, reference, part)
         else:  # openai with a style: the style direction becomes the instructions
             f = part.with_suffix(".mp3")
-            _openai(spoken, f, voice, direct)
+            _openai(spoken, f, voice, say)
             pcm = wb_video.load_audio(f, stereo=False)
             f.unlink(missing_ok=True)
-        return Clip(pcm, anchor_words(disp, pcm), segs[0].pause_before_ms)
+        if engine in PROSODY_DSP_ENGINES and same:
+            pcm = wb_video.apply_prosody(pcm, s0.mood_rate, s0.mood_st, s0.gain_db, s0.ramp_db)
+        return Clip(pcm, anchor_words(disp, pcm), s0.pause_before_ms)
 
     try:
         with ThreadPoolExecutor(max_workers=PARALLEL.get(engine, 2)) as ex:
@@ -945,6 +964,9 @@ def main(argv=None) -> int:
     p.add_argument("--srt", default=None)
     p.add_argument("--words", default=None)
     p.add_argument("--chunk", default=None, choices=["sentence", "paragraph"])
+    p.add_argument("--mood", default=None, help="default mood: " + ", ".join(vs.MOODS))
+    p.add_argument("--expressiveness", type=float, default=1.0, help="0 = flat, 1 = default, 2 = strong")
+    p.add_argument("--no-auto-mood", action="store_true", help="only [mood] tags / --mood, no automatic reading")
     p.add_argument("--list-voices", default=None, metavar="LOCALE_PREFIX",
                    help="edge voices for a locale; 'vieneu' lists the VieNeu presets")
     a = p.parse_args(argv)
@@ -957,7 +979,8 @@ def main(argv=None) -> int:
     text = Path(a.text[1:]).read_text(encoding="utf-8") if a.text.startswith("@") else a.text
     r = synthesize(text, a.out, a.engine, a.voice, a.rate, a.pitch, instructions=a.instructions,
                    style=a.style, pause_scale=a.pause_scale, reference=a.reference,
-                   reference_text=a.reference_text, consent=a.confirm_authorized_voice, chunk=a.chunk)
+                   reference_text=a.reference_text, consent=a.confirm_authorized_voice, chunk=a.chunk,
+                   mood=a.mood, expressiveness=a.expressiveness, auto_mood=not a.no_auto_mood)
     if a.srt:
         Path(a.srt).write_text(words_to_srt(r.words), encoding="utf-8")
     if a.words:

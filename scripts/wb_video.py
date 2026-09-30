@@ -246,6 +246,80 @@ def polish_voice(a: np.ndarray, preset: str = "broadcast") -> np.ndarray:
     return x[:, 0] if mono else x
 
 
+def time_stretch(x: np.ndarray, speed: float, sr: int = SAMPLE_RATE) -> np.ndarray:
+    """Change the tempo of mono speech without changing its pitch (WSOLA).
+
+    ``speed`` > 1 is faster/shorter.  30 ms Hann grains at 50 % overlap; each grain is
+    taken where it best continues the previous one (cross-correlation over +-10 ms,
+    coarse at 12 kHz then refined), which keeps voiced sounds free of phasing.
+    """
+    x = np.asarray(x, np.float32)
+    if abs(speed - 1.0) < 0.005 or len(x) < sr // 20:
+        return x.copy()
+    win = int(0.030 * sr) // 8 * 8
+    hs = win // 2
+    ha = hs * speed
+    tol = int(0.010 * sr) // 4 * 4
+    w = (0.5 - 0.5 * np.cos(2 * np.pi * np.arange(win) / win)).astype(np.float32)   # periodic Hann
+    pad = np.concatenate([np.zeros(tol, np.float32), x, np.zeros(win + 2 * tol + hs, np.float32)])
+    n_out = int(round(len(x) / speed))
+    frames = n_out // hs + 2
+    out = np.zeros(frames * hs + win, np.float32)
+    prev = 0                                   # where the last grain was read (in ``pad``)
+    for k in range(frames):
+        target = tol + int(round(k * ha))
+        if target + win + tol > len(pad):
+            break
+        if k == 0:
+            pos = target
+        else:
+            tmpl = pad[prev + hs:prev + hs + win]          # natural continuation of the last grain
+            lo = target - tol
+            region = pad[lo:lo + win + 2 * tol]
+            c = np.correlate(region[::4], tmpl[::4], "valid")
+            best = int(np.argmax(c)) * 4
+            fine = [float(np.dot(region[j:j + win], tmpl)) for j in
+                    range(max(0, best - 3), min(2 * tol, best + 3) + 1)]
+            pos = lo + max(0, best - 3) + int(np.argmax(fine))
+        out[k * hs:k * hs + win] += pad[pos:pos + win] * w
+        prev = pos
+    return out[:n_out]
+
+
+def resample_ratio(x: np.ndarray, ratio: float) -> np.ndarray:
+    """Resample so the result has ``len(x) * ratio`` samples (band-limited, FFT; clips
+    are short speech with silent edges, so the periodic assumption is harmless)."""
+    x = np.asarray(x, np.float64)
+    n = len(x)
+    m = int(round(n * ratio))
+    if m == n or n < 2:
+        return x.astype(np.float32)
+    X = np.fft.rfft(x)
+    Y = np.zeros(m // 2 + 1, np.complex128)
+    c = min(len(X), len(Y))
+    Y[:c] = X[:c]
+    return (np.fft.irfft(Y, m) * (m / n)).astype(np.float32)
+
+
+def apply_prosody(x: np.ndarray, rate_pct: float = 0.0, semitones: float = 0.0, gain_db: float = 0.0,
+                  ramp_db: float = 0.0, sr: int = SAMPLE_RATE) -> np.ndarray:
+    """Re-deliver a mono speech clip: tempo (+10 = 10 % faster), pitch (semitones, the
+    formants move with it, so keep it within about +-2), overall gain and a loudness
+    ramp across the clip (crescendo > 0).  Used for engines that have no prosody controls."""
+    y = np.asarray(x, np.float32)
+    speed = 1.0 + rate_pct / 100.0
+    if abs(semitones) >= 0.05:
+        r = 2.0 ** (semitones / 12.0)
+        y = resample_ratio(y, 1.0 / r)          # higher pitch, r x faster ...
+        y = time_stretch(y, speed / r, sr)       # ... then set the tempo we want
+    elif abs(speed - 1.0) >= 0.005:
+        y = time_stretch(y, speed, sr)
+    if gain_db or ramp_db:
+        env = np.linspace(-0.5, 0.5, len(y), dtype=np.float32) * ramp_db + gain_db
+        y = y * (10.0 ** (env / 20.0))
+    return y
+
+
 def fade(a: np.ndarray, in_ms: float = 0, out_ms: float = 0) -> np.ndarray:
     a = a.copy()
     for ms, rev in ((in_ms, False), (out_ms, True)):

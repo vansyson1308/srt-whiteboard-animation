@@ -9,7 +9,9 @@ Rules (all times are relative to the scene start):
     anchored ones, snapping to sentence starts when possible;
   * each element draws until shortly before the next one starts, clamped to
     [minDrawMs, maxDrawMs] so the pen never crawls or rushes;
-  * the scene lasts until the voice ends + a short hold.
+  * the scene lasts until the voice ends + a short hold;
+  * ``filler`` elements (SVG ``data-filler``) are left out: the renderer draws
+    them in the pauses where the hand would otherwise wait.
 """
 from __future__ import annotations
 
@@ -68,11 +70,18 @@ def schedule(elements: list[dict], words: list[Word], speech_end_ms: int | None 
     duration in ms.
     """
     o = opts or SyncOptions()
-    els = sorted(elements, key=lambda e: e.get("sequence", 0))
+    end_ms = speech_end_ms if speech_end_ms is not None else (words[-1].endMs if words else 0)
+    # data-filler doodles follow no phrase: the renderer puts them into the pauses
+    for e in elements:
+        if e.get("filler"):
+            rv = e.setdefault("reveal", {})
+            rv.update(startMs=int(end_ms), durationMs=o.min_draw_ms)
+            rv.setdefault("direction", "left_to_right")
+            rv.setdefault("protectedRegions", [])
+    els = sorted((e for e in elements if not e.get("filler")), key=lambda e: e.get("sequence", 0))
     n = len(els)
     if n == 0:
-        return (speech_end_ms or 0) + o.tail_ms
-    end_ms = speech_end_ms if speech_end_ms is not None else (words[-1].endMs if words else 0)
+        return (end_ms or 0) + o.tail_ms
 
     # 1) anchors from `say`
     anchors: list[int | None] = [None] * n

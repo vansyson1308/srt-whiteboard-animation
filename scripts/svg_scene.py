@@ -14,7 +14,8 @@ SVG conventions (see docs/SVG_GUIDE.md):
       data-label="Mặt trời"          human readable name
       data-say="mặt trời"            phrase in the narration that triggers drawing it
       data-role="nhân vật chính"     narrative role (free text)
-      data-color="fade|contour-wipe|brush|none"  (reserved)
+      data-color="fade|contour-wipe|brush|none"  colour pass for this group
+      data-filler="1"                decoration drawn in a pause (no data-say)
   * ``<text>`` inside a group is "hand-written" left to right
   * a full-canvas ``<rect>`` directly under ``<svg>`` is taken as the paper colour
   * top-level shapes outside groups are collected into one element drawn first
@@ -343,6 +344,8 @@ def build(svg_path: str | Path, out_dir: str | Path | None = None, width: int = 
             el["say"] = g.get("data-say")
         if g.get("data-color"):
             el["colorFill"] = g.get("data-color")
+        if g.get("data-filler") not in (None, "", "false", "0"):
+            el["filler"] = True
         elements.append(el)
         t += dur + 250
     mask_path = out_dir / (svg_path.stem + ".masks.png")

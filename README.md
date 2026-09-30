@@ -142,8 +142,12 @@ Nhờ vậy tiếng và hình không bao giờ lệch nhau.
   - đọc từng câu với ngữ điệu riêng;
   - khoảng lặng giữa các câu theo phong cách;
   - tự thêm chỗ lấy hơi trong câu dài.
+- **Điều tiết theo nội dung (mood):** mỗi câu có cảm xúc riêng, quyết định tốc độ, cao độ, độ to và khoảng nghỉ quanh câu.
+  - Đoạn cao trào đọc nhanh, cao và to dần. Đoạn xúc động đọc chậm, trầm và nhỏ dần. Đoạn hồi hộp nén giọng rồi dừng lâu trước câu "lật bài". Ý cốt lõi đọc chậm và rõ. Đoạn liệt kê đọc lướt nhanh.
+  - Đặt bằng tag ở đầu câu: `[cao trào]`, `[xúc động]`, `[hồi hộp]`, `[chậm]`, `[nhanh]`, `[vui]`. Không có tag thì hệ thống tự đọc cảm xúc từ từ ngữ và dấu câu.
+  - `"expressiveness"` (0–2) chỉnh độ đậm; `"voice": {"mood": "emotional"}` cho cả cảnh. Với VieNeu, tốc độ và cao độ được chỉnh bằng xử lý âm thanh (WSOLA) nên giữ nguyên chất giọng.
 - **Tinh chỉnh trong lời thoại:**
-  - Chèn `[pause 600ms]` để ngắt nghỉ có chủ ý; thẻ này không hiện trong phụ đề.
+  - Chèn `[pause 600ms]` để ngắt nghỉ có chủ ý; thẻ này (và tag cảm xúc) không hiện trong phụ đề.
   - `"lexicon": {"GPT": "gi pi ti"}` dạy cách đọc từ viết tắt.
 - **Xử lý âm thanh `"fx": "broadcast"`** (mặc định): lọc ù, làm rõ tiếng, nén nhẹ như giọng phát thanh.
 - **Tự đọc lại câu lỗi:** câu VieNeu đọc lan man hoặc nuốt chữ được đọc lại, giữ bản tốt nhất.
@@ -172,6 +176,11 @@ Nhờ vậy tiếng và hình không bao giờ lệch nhau.
   - bút tăng tốc ở đầu nét, chậm lại ở góc cua và cuối nét;
   - dừng một nhịp khi đặt bút và khi nhấc bút;
   - bàn tay nhấc khỏi giấy khi chuyển nét (`render.penLift`).
+- **Không có động tác thừa** (`render.idleHand: "exit"`, mặc định):
+  - mỗi phần tử được vẽ với tốc độ tự nhiên (`render.drawSpeed`) thay vì kéo dài cho kín thời gian;
+  - vẽ xong mà chưa tới phần tử sau: nghỉ ngắn thì nhấc bút đứng yên rồi di chuyển thẳng tới chỗ vẽ tiếp, nghỉ dài thì rút tay ra khỏi khung và đưa vào lại đúng lúc;
+  - chữ và nét không có mảng màu thì bỏ qua bước tô; bước tô chỉ quét trên vùng thật sự có màu;
+  - hình trang trí `data-filler="1"` được vẽ vào khoảng nghỉ thay cho việc đứng chờ.
 - **Camera `follow`:** zoom mượt vào phần tử đang vẽ, lùi ra toàn cảnh ở cuối mỗi cảnh.
 - **Bàn tay:** mặc định không có chữ. `brand_hand.py "Tên kênh"` in tên kênh lên bút.
 

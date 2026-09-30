@@ -42,7 +42,7 @@ def wav_bytes(a: np.ndarray, rate: int = SR) -> bytes:
 
 def test_plan_styles_pauses_and_sentence_types():
     text = "Gập giấy 42 lần thì sao? Nó dày tới Mặt Trăng!\n\nVậy tại sao? [pause 1.5s] Hãy cùng xem."
-    plan = vs.plan_script(text, "story", rate="+4%")
+    plan = vs.plan_script(text, "story", rate="+4%", auto_mood=False)     # the style layer alone
     segs = plan.segments
     assert [s.type for s in segs] == ["question", "exclamation", "question", "statement"]
     assert [s.boundary for s in segs] == ["start", "sentence", "paragraph", "sentence"]
@@ -52,9 +52,44 @@ def test_plan_styles_pauses_and_sentence_types():
     assert segs[3].pause_before_ms == 1500 and segs[3].manual_pause          # [pause 1.5s] is exact
     # style rate -8 + user +4, question tweak -1, paragraph start 0
     assert segs[0].rate == -8 + 4 - 1 and segs[0].pitch == 0 + 3 + 1
-    ads = vs.plan_script(text, "ads")
+    ads = vs.plan_script(text, "ads", auto_mood=False)
     assert ads.segments[1].pause_before_ms < segs[1].pause_before_ms       # punchier pacing
     assert vs.strip_pause_tags(text).endswith("Vậy tại sao? Hãy cùng xem.")
+
+
+def test_moods_from_tags_scene_and_words():
+    text = ("Năm 1923, nước Đức in tiền không ngừng. Giá bánh mì lên tới hàng nghìn tỷ mark! "
+            "Người mẹ già ngồi khóc. Bà ngồi đó. [nhanh] Rồi đến Hungary, Zimbabwe, Venezuela.")
+    segs = vs.plan_script(text, "natural").segments
+    assert [s.mood for s in segs] == ["neutral", "climax", "emotional", "emotional", "fast"]
+    assert segs[3].intensity < segs[2].intensity                     # the feeling lingers, weaker
+    assert segs[1].rate > segs[0].rate and segs[1].pitch > segs[0].pitch and segs[1].gain_db > 0
+    assert segs[2].rate < segs[0].rate and segs[2].mood_st < 0 and segs[2].gain_db < 0
+    assert segs[2].pause_before_ms > segs[1].pause_before_ms > 400    # room around big moments
+    assert vs.strip_pause_tags(text).count("[") == 0 and segs[4].display.startswith("Rồi đến Hungary")
+    flat = vs.plan_script(text, "natural", expressiveness=0).segments
+    assert all(s.mood_rate == 0 and s.gain_db == 0 for s in flat)
+    assert all(s.mood == "emotional" for s in vs.plan_script(text, "natural", mood="xúc động").segments[:3])
+    assert vs.plan_script("[Cao trào] Xong rồi.", "natural").segments[0].mood == "climax"
+    assert vs.detect_mood("Lạm phát là khi giá cả tăng.") == ("neutral", 0.0)
+
+
+def test_apply_prosody_changes_tempo_and_pitch():
+    import wb_video as wv
+    sr = wv.SAMPLE_RATE
+    t = np.arange(sr) / sr
+    x = sum(np.sin(2 * np.pi * 150 * k * t) / k for k in range(1, 10)).astype(np.float32) * 0.2
+
+    def f0(y):
+        seg = y[sr // 4:sr // 4 + 4096].astype(np.float64)
+        ac = np.correlate(seg, seg, "full")[len(seg) - 1:]
+        return sr / (sr // 400 + np.argmax(ac[sr // 400:sr // 60]))
+    slow = wv.apply_prosody(x, rate_pct=-12)
+    assert abs(len(slow) - len(x) / 0.88) < 2 and abs(f0(slow) - 150) < 4        # longer, same pitch
+    up = wv.apply_prosody(x, semitones=2)
+    assert abs(len(up) - len(x)) < 2 and abs(f0(up) - 150 * 2 ** (2 / 12)) < 4   # same length, higher
+    loud = wv.apply_prosody(x, gain_db=6, ramp_db=4)
+    assert np.abs(loud[-sr // 10:]).max() > np.abs(loud[:sr // 10]).max() * 1.4    # crescendo
 
 
 def test_segmenter_keeps_abbreviations_and_splits_long():
@@ -199,7 +234,7 @@ def test_vieneu_engine_per_sentence_and_consent(monkeypatch, tmp_path):
 
     monkeypatch.setattr(tts, "_vieneu", fake_vieneu)
     r = tts.synthesize("Lạm phát là gì? Nó lấy đi sức mua của tiền.", tmp_path / "v.mp3", "vieneu",
-                       style="news")
+                       style="news", auto_mood=False)
     assert [c[1] for c in calls] == ["Hải Đăng", "Hải Đăng"]               # default voice, per sentence
     assert r.audio.endswith(".wav") and len(r.words) == 11
     gap = r.words[4].startMs - r.words[3].endMs
@@ -208,6 +243,17 @@ def test_vieneu_engine_per_sentence_and_consent(monkeypatch, tmp_path):
     ref.write_bytes(wav_bytes(speech([(0, 500)], 600)))
     with pytest.raises(RuntimeError, match="consent"):
         tts.synthesize("Xin chào.", tmp_path / "c.mp3", "vieneu", reference=str(ref))
+
+
+def test_vieneu_moods_retime_the_audio(monkeypatch, tmp_path):
+    monkeypatch.setattr(tts, "_vieneu", lambda text, voice, reference, tmp:
+                        speech([(60, 60 + 260 * len(text.split()))], 200 + 260 * len(text.split())))
+    text = "Nước Đức in tiền mỗi ngày. Người mẹ già ngồi khóc mãi."
+    span = lambda ws: ws[-1].endMs - ws[0].startMs  # noqa: E731
+    r = tts.synthesize(text, tmp_path / "m.mp3", "vieneu", style="natural")
+    assert span(r.words[6:]) > 1.1 * span(r.words[:6])               # the sad line is read slower
+    flat = tts.synthesize(text, tmp_path / "f.mp3", "vieneu", style="natural", expressiveness=0)
+    assert abs(span(flat.words[6:]) - span(flat.words[:6])) < 60
 
 
 def test_chunk_override_groups_sentences(monkeypatch, tmp_path):
