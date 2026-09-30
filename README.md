@@ -204,6 +204,18 @@ Nhờ vậy tiếng và hình không bao giờ lệch nhau.
   $PY -m pytest -q tests
   ```
 
+### Giao video dài (> 30 MB) từ phiên cloud
+
+Chat chỉ đính kèm được file ≤ 30 MB. Với video dài, dùng:
+
+```bash
+$PY scripts/share_video.py out/video.mp4 --title "Tên video"   # [--chunk-mb 14] [--out-dir share/]
+```
+
+Script cắt video thành các phần ≤ 14 MB, không nén lại, rồi tạo trang `index.html` kèm manifest (kích thước, SHA-256).
+Agent publish trang này thành một Artifact riêng tư với capability `downloads`. Mỗi lượt publish ≤ 60 MB; các lượt sau dùng cùng trang và cộng dồn file.
+Người dùng mở link rồi bấm **Tải video**: trang ghép lại đúng từng byte, kiểm tra SHA-256 và phát. Bấm **Lưu video (.mp4)** để lưu bản gốc về máy.
+
 ### Xử lý sự cố
 
 | Triệu chứng | Cách xử lý |
@@ -213,6 +225,7 @@ Nhờ vậy tiếng và hình không bao giờ lệch nhau.
 | phần tử vẽ sai lúc | `data-say` không khớp nguyên văn lời thoại; xem log `-- sync` |
 | vùng vẽ sai (ảnh raster) | mở `assets/preview.html`, chỉnh vùng, lưu, chạy lại |
 | muốn làm lại từ đầu | `--no-cache` hoặc xoá `build/` |
+| video quá lớn để gửi qua chat | `scripts/share_video.py` (xem trên) |
 
 ### Quy trình cũ (SRT + ảnh + chỉnh tay) vẫn dùng được
 
@@ -237,6 +250,7 @@ scripts/
   captions.py  wb_video.py      phụ đề; I/O video & âm thanh (PyAV), xử lý giọng, loudness
   gen_music.py                  nhạc nền procedural
   qa_frames.py  render_annotation_preview.py  brand_hand.py  generate_images.py
+  share_video.py                giao video lớn: cắt phần + trang xem/tải bản gốc
   stream_render.py  parse_srt.py  merge_scenes.py  prepare_env.py
 assets/     bàn tay, font tiếng Việt (OFL), preview.html
 examples/   demo-bau-troi (16:9 + 9:16) · showcase-gap-giay (9:16) · lam-phat (9:16)

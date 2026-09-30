@@ -71,6 +71,13 @@ $PY scripts/make_video.py projects/<slug>/video.json
 Kết quả trong `projects/<slug>/out/`: `*-portrait.mp4` (TikTok/Shorts/Reels), `*-landscape.mp4` (YouTube), `*.srt`, `*-qa.jpg`, `*-report.json`.
 Xem `*-qa.jpg` một lần cuối, rồi báo cho người dùng: đường dẫn file, thời lượng, loudness, và gợi ý tiêu đề + mô tả + 5 hashtag.
 
+### 6. Giao file cho người dùng (video lớn)
+Chat chỉ nhận file ≤ 30 MB, nên video dài (vài phút 1080p thường 50–150 MB) phải giao qua một trang Artifact:
+```bash
+$PY scripts/share_video.py projects/<slug>/out/<slug>-landscape.mp4 --title "Tên video"
+```
+Script cắt file thành các phần ≤ 14 MB (`share-<tên>/parts/`), tạo `index.html` và in các lượt publish. Publish `index.html` bằng Artifact tool, kèm `files` của lượt 1, `capabilities: {"downloads": true}` và `icon: "video"`. Các lượt sau publish lại **cùng file_path** chỉ với `files` còn lại (file được cộng dồn). Trang tự ghép các phần, kiểm tra SHA-256, phát video và có nút **Lưu video (.mp4)** để tải bản gốc, không nén lại. Trang là riêng tư; không đưa video lên repo.
+
 ## Tuỳ chọn hay dùng trong `video.json`
 
 | Muốn | Đặt |
@@ -132,6 +139,7 @@ Engine không có timestamp (vieneu/gemini/tiktok/makevoice/openai/fish) đượ
 | `render_stream_whiteboard.py` | Render một cảnh (tương thích CLI cũ) |
 | `render_annotation_preview.py` | Ảnh kiểm tra vùng/thời gian |
 | `qa_frames.py` | Contact sheet + thông số video/âm thanh |
+| `share_video.py` | Giao video lớn: cắt phần + trang Artifact xem/tải bản gốc |
 | `generate_images.py` | Tạo ảnh line-art bằng OpenAI/Gemini (tuỳ chọn) |
 | `brand_hand.py` | In tên kênh lên bút |
 | `gen_music.py` | Nhạc nền procedural, không bản quyền |
