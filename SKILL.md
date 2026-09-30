@@ -75,7 +75,7 @@ Xem `*-qa.jpg` một lần cuối, rồi báo cho người dùng: đường dẫ
 
 | Muốn | Đặt |
 |---|---|
-| Giọng nam | `"voice": {"voice": "vi-VN-NamMinhNeural"}` |
+| Giọng nam (mặc định) | VieNeu `Hải Đăng`; nam khác: `"voice": {"voice": "Thiện Minh"}` (kể chuyện), `"Minh Đức"` (tin tức), `"Thanh Bình"` |
 | Đọc nhanh hơn | `"voice": {"rate": "+10%"}` |
 | Đọc có hồn hơn | `"voice": {"style": "podcast"}` (hoặc `story` / `news` / `ads` / `natural`) |
 | Giọng Việt tự nhiên, miễn phí, chạy offline | `"voice": {"engine": "vieneu", "voice": "Hải Đăng", "style": "podcast"}` (cần `pip install vieneu`) |
@@ -96,6 +96,8 @@ Schema đầy đủ: **docs/PROJECT_FORMAT.md**.
 ## Giọng đọc (Voice Studio – từ ttspromax)
 
 `"style"` bật "đạo diễn giọng đọc": mỗi câu được đọc riêng với tốc độ/cao độ theo loại câu (hỏi, cảm thán, đầu/cuối đoạn), thêm dấu phẩy lấy hơi trước từ nối trong câu dài, và ghép lại với khoảng lặng chính xác theo phong cách. Mặc định `"natural"`; `"plain"` = đọc một lượt như cũ.
+
+**Mặc định**: engine `vieneu`, giọng nam `Hải Đăng`, `"fx": "broadcast"` (lọc ù, tăng độ rõ, nén nhẹ như giọng phát thanh). Chưa cài `vieneu` thì tự chuyển sang edge `vi-VN-NamMinhNeural`. Mỗi câu VieNeu có độ dài bất thường (đọc lan man/nuốt chữ) được đọc lại, giữ bản tốt nhất (`VIENEU_TAKES`, mặc định 3).
 
 | Engine | Giọng (`voice`) | Cần | Ghi chú |
 |---|---|---|---|

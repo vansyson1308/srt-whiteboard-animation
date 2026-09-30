@@ -42,6 +42,7 @@ import argparse
 import asyncio
 import base64
 import json
+import math
 import os
 import re
 import sys
@@ -519,18 +520,58 @@ def vieneu_voices() -> list[str]:
     return [vid for _, vid in _vieneu_model().list_preset_voices()]
 
 
-def _vieneu(text: str, voice: str, reference: str | None, tmp: Path):
-    """One VieNeu synthesis -> mono float32 at 48 kHz."""
+def engine_available(engine: str) -> bool:
+    """False when an optional engine's package is missing (callers fall back to edge)."""
+    import importlib.util
+    mod = {"vieneu": "vieneu", "fish": "fishaudio"}.get(engine)
+    return mod is None or importlib.util.find_spec(mod) is not None
+
+
+def plausible_speech(text: str, pcm, lo: float = 0.55, hi: float = 1.8) -> float:
+    """How far the voiced length is from what the text needs (1.0 = as expected).
+
+    Generative voices occasionally babble, stall or swallow words; those takes are
+    far off the ~4.5 syllables/s of narration.  Returns the ratio voiced/expected.
+    """
     import wb_video
-    with _VIENEU_LOCK:                      # CPU-bound and not re-entrant
-        tts = _vieneu_model()
-        if reference:
-            wav = tts.infer(text, ref_audio=reference)
-        else:
-            if tts.resolve_voice_name(voice) is None:
-                raise RuntimeError(f"unknown VieNeu voice {voice!r}; available: {vieneu_voices()}")
-            wav = tts.infer(text, voice=tts.get_preset_voice(voice))
-        rate = tts.sample_rate
+    iv = _voiced_intervals(pcm, 250)
+    voiced = sum(e - s for s, e in iv) / 1000.0
+    syllables = sum(_speech_weight(t) for t in tokens(text)) / 5.5
+    expected = max(0.4, syllables / 4.5)
+    return voiced / expected if len(pcm) > wb_video.SAMPLE_RATE // 20 else 0.0
+
+
+VIENEU_TAKES = int(os.environ.get("VIENEU_TAKES", "3"))    # max takes per sentence
+
+
+def _vieneu(text: str, voice: str, reference: str | None, tmp: Path):
+    """One VieNeu synthesis -> mono float32 at 48 kHz.  A take whose length is
+    implausible for the text (babbling / swallowed words) is generated again and the
+    most plausible take is kept."""
+    import wb_video
+    best, best_err = None, float("inf")
+    for _ in range(max(1, VIENEU_TAKES)):
+        with _VIENEU_LOCK:                      # CPU-bound and not re-entrant
+            tts = _vieneu_model()
+            if reference:
+                wav = tts.infer(text, ref_audio=reference)
+            else:
+                if tts.resolve_voice_name(voice) is None:
+                    raise RuntimeError(f"unknown VieNeu voice {voice!r}; available: {vieneu_voices()}")
+                wav = tts.infer(text, voice=tts.get_preset_voice(voice))
+            rate = tts.sample_rate
+        pcm = _vieneu_to48k(wav, rate, tmp)
+        ratio = plausible_speech(text, pcm)
+        err = abs(math.log(max(ratio, 1e-3)))
+        if err < best_err:
+            best, best_err = pcm, err
+        if 0.55 <= ratio <= 1.8:
+            break
+    return best
+
+
+def _vieneu_to48k(wav, rate: int, tmp: Path):
+    import wb_video
     f = tmp.with_suffix(".wav")
     wb_video.save_wav(f, wav, sample_rate=rate)
     try:

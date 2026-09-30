@@ -34,6 +34,11 @@ DEPS: dict[str, str] = {
     "resvg_py": "resvg-py",  # SVG -> PNG without system libraries
     "svgelements": "svgelements",  # SVG path geometry -> vector pen strokes
 }
+# optional: best free Vietnamese voice (offline VieNeu-TTS); if it can't be installed the
+# pipeline falls back to edge-tts, so a failure here never blocks the environment
+OPTIONAL_DEPS: dict[str, str] = {
+    "vieneu": "vieneu",
+}
 
 
 def interpreter_path() -> Path:
@@ -102,6 +107,12 @@ def main() -> None:
             sys.exit(1)
         if not install(py, missing):
             sys.exit(1)
+    for import_name, pip_name in OPTIONAL_DEPS.items():
+        if can_import(py, import_name):
+            print(f"[ok] {pip_name} (optional)")
+        elif not check_only:
+            ok = install(py, [pip_name])
+            print(f"[{'ok' if ok else 'skip'}] {pip_name} (optional)")
 
     # 末行：供调用方捕获的约定输出
     print(f"\nENV_PY={py}")

@@ -10,12 +10,13 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
   "fps": 30,
 
   "voice": {                                 // TTS theo từng cảnh (null = không đọc)
-    "engine": "edge",                        // edge | vieneu | gemini | elevenlabs | openai | fish | tiktok | makevoice | silent
-    "voice": "vi-VN-HoaiMyNeural",           // hoặc vi-VN-NamMinhNeural, Sulafat (gemini), BV074_streaming (tiktok)…
+    "engine": "vieneu",                      // vieneu (mặc định) | edge | gemini | elevenlabs | openai | fish | tiktok | makevoice | silent
+    "voice": "Hải Đăng",                     // giọng nam VieNeu; Thiện Minh, Minh Đức… / vi-VN-NamMinhNeural (edge) / Sulafat (gemini)
     "style": "natural",                      // natural | news | story | podcast | ads | plain (đọc một lượt)
     "rate": "+5%", "pitch": "+0Hz",          // cộng thêm vào phong cách (edge)
     "pauseScale": 1.0,                       // nhân độ dài khoảng lặng tự động (0.3–3)
     "chunk": null,                           // "sentence" | "paragraph": mỗi request một câu hay cả đoạn (mặc định theo engine)
+    "fx": "broadcast",                       // xử lý giọng kiểu phát thanh (lọc ù, rõ tiếng, nén nhẹ); "none" để tắt
     "lexicon": {"GPT": "gi pi ti"},          // cách đọc từ viết tắt / tên riêng
     "instructions": null,                    // gemini/openai: tự mô tả giọng điệu (thay cho style)
     "reference": null, "referenceText": null, "confirmAuthorizedVoice": false   // fish: clone giọng có sự đồng ý
@@ -29,7 +30,9 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
                                              // hoặc {"generate": "calm"|"bright"} = nhạc tự tạo, không bản quyền
   "sfx":    { "pen": true, "volumeDb": -17 },       // tiếng bút sột soạt khi đang vẽ
   "render": { "inkPath": "skeleton", "colorFill": "contour-wipe", "camera": "follow",
-              "cameraMaxZoom": 1.2, "paper": "#F6F1E3", "hand": null, "handHeightRatio": 0.42 },
+              "cameraMaxZoom": 1.2, "paper": "#F6F1E3", "hand": null, "handHeightRatio": 0.42,
+              "humanMotion": true,                  // nhịp tay người: chậm ở góc/cuối nét, dừng khi đặt/nhấc bút
+              "penLift": 14 },                      // px (ở 1080p) bàn tay nhấc lên khi di chuyển giữa các nét
   "sync":   { "leadMs": 250, "voiceDelayMs": 200, "minDrawMs": 900, "maxDrawMs": 4500, "tailMs": 800 },
   "transition": { "type": "fade", "ms": 350 },      // fade | slide | cut
   "audio_master": { "lufs": -14 },

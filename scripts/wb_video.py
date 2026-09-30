@@ -199,6 +199,53 @@ def duck_music(music: np.ndarray, voice: np.ndarray, base_gain_db: float = -18.0
     return music * (gain[:, None] if music.ndim == 2 else gain)
 
 
+def polish_voice(a: np.ndarray, preset: str = "broadcast") -> np.ndarray:
+    """Radio-style narration chain: rumble high-pass, less boxiness, presence and air,
+    then gentle compression so soft syllables and punchlines sit at the same level.
+
+    Zero-phase EQ in the frequency domain + frame-wise RMS compressor (vectorised,
+    no per-sample Python loops).  Output keeps the input's RMS; the final loudness
+    is set later by the mix.
+    """
+    if preset in (None, "none", False) or len(a) < SAMPLE_RATE // 10:
+        return a
+    x = a.astype(np.float64)
+    mono = x.ndim == 1
+    if mono:
+        x = x[:, None]
+    rms_in = float(np.sqrt(np.mean(x ** 2))) or 1.0
+    n = len(x)
+    f = np.fft.rfftfreq(n, 1 / SAMPLE_RATE)
+    f[0] = 1.0
+
+    def bell(f0: float, gain_db: float, oct_bw: float) -> np.ndarray:
+        return gain_db * np.exp(-0.5 * (np.log2(f / f0) / (oct_bw / 2.355)) ** 2)
+    hp = (f / 75.0) ** 2 / np.sqrt(1 + (f / 75.0) ** 4)                       # 2nd-order high-pass
+    gain_db = bell(280, -2.0, 1.2) + bell(3200, 2.5, 1.6) + 1.5 / (1 + (9000 / f) ** 2)
+    h = hp * 10 ** (gain_db / 20)
+    h[0] = 0.0
+    x = np.fft.irfft(np.fft.rfft(x, axis=0) * h[:, None], n=n, axis=0)
+    # compressor on 10 ms frames: 2.5:1 above the speech's upper-mid level
+    hop = SAMPLE_RATE // 100
+    m = n // hop
+    if m > 4:
+        env = np.sqrt(np.mean(x[:m * hop].mean(axis=1).reshape(m, hop) ** 2, axis=1) + 1e-12)
+        lvl = 20 * np.log10(env)
+        voiced = lvl[lvl > lvl.max() - 40]
+        thr = float(np.percentile(voiced, 60)) if voiced.size else lvl.max()
+        red = np.where(lvl > thr, (lvl - thr) * (1 - 1 / 2.5), 0.0)
+        red = np.convolve(red, np.ones(5) / 5, mode="same")                      # ~50 ms smoothing
+        g = 10 ** (-np.repeat(red, hop) / 20)
+        g = np.concatenate([g, np.full(n - len(g), g[-1] if len(g) else 1.0)])
+        x = x * g[:, None]
+    x *= rms_in / (float(np.sqrt(np.mean(x ** 2))) or 1.0)
+    peak = float(np.max(np.abs(x))) or 1.0
+    if peak > 0.99:
+        x *= 0.99 / peak
+    x = x.astype(np.float32)
+    return x[:, 0] if mono else x
+
+
 def fade(a: np.ndarray, in_ms: float = 0, out_ms: float = 0) -> np.ndarray:
     a = a.copy()
     for ms, rev in ((in_ms, False), (out_ms, True)):
