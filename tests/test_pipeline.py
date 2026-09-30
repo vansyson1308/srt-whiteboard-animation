@@ -257,3 +257,22 @@ def test_pen_timeline_human_pacing():
     assert up[draw[idx] == 0].mean() > up[draw[idx] == 1].mean()  # hand lifted while travelling
     flat, _ = pen_timeline(pts, draw, frames, human=False)
     assert flat[-1] == len(pts) - 1 and per_frame.sum() == len(pts) - 1
+
+
+def test_share_video_parts_rebuild_original(tmp_path):
+    import hashlib
+    import re
+
+    import share_video
+    src = tmp_path / "clip.mp4"
+    data = np.random.default_rng(3).integers(0, 256, 2_500_000, dtype=np.uint8).tobytes()
+    src.write_bytes(data)
+    out = tmp_path / "share"
+    assert share_video.main([str(src), "--title", "Thử <b>&", "--out-dir", str(out), "--chunk-mb", "1"]) == 0
+    page = (out / "index.html").read_text(encoding="utf-8")
+    assert "<title>Thử &lt;b&gt;&amp;</title>" in page
+    m = json.loads(re.search(r'id="manifest">(.*?)</script>', page, re.S).group(1))
+    assert m["size"] == len(data) and m["sha256"] == hashlib.sha256(data).hexdigest()
+    assert [p["path"] for p in m["parts"]] == [f"parts/part-{i:02d}.mp4" for i in (1, 2, 3)]
+    rebuilt = b"".join((out / p["path"]).read_bytes() for p in m["parts"])
+    assert rebuilt == data and all(p["size"] <= 1024 * 1024 for p in m["parts"])
