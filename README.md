@@ -145,7 +145,8 @@ Nhờ vậy tiếng và hình không bao giờ lệch nhau.
 - **Điều tiết theo nội dung (mood):** mỗi câu có cảm xúc riêng, quyết định tốc độ, cao độ, độ to và khoảng nghỉ quanh câu.
   - Đoạn cao trào đọc nhanh, cao và to dần. Đoạn xúc động đọc chậm, trầm và nhỏ dần. Đoạn hồi hộp nén giọng rồi dừng lâu trước câu "lật bài". Ý cốt lõi đọc chậm và rõ. Đoạn liệt kê đọc lướt nhanh.
   - Đặt bằng tag ở đầu câu: `[cao trào]`, `[xúc động]`, `[hồi hộp]`, `[chậm]`, `[nhanh]`, `[vui]`. Không có tag thì hệ thống tự đọc cảm xúc từ từ ngữ và dấu câu.
-  - `"expressiveness"` (0–2) chỉnh độ đậm; `"voice": {"mood": "emotional"}` cho cả cảnh. Với VieNeu, tốc độ và cao độ được chỉnh bằng xử lý âm thanh (WSOLA) nên giữ nguyên chất giọng.
+  - `"expressiveness"` (0–2) chỉnh độ đậm; `"voice": {"mood": "emotional"}` cho cả cảnh. Với VieNeu, cảm xúc thể hiện qua tốc độ (chỉnh nhẹ bằng WSOLA), độ to và khoảng nghỉ. Cao độ không bị dịch bằng xử lý âm thanh, để giữ nguyên chất giọng.
+- **Tên riêng tiếng Anh:** cứ viết đúng chính tả gốc. VieNeu tự đọc theo phiên âm tiếng Anh. Không phiên âm kiểu "Niu-tơn" trong `lexicon`, vì như vậy sẽ ép đọc thuần Việt.
 - **Tinh chỉnh trong lời thoại:**
   - Chèn `[pause 600ms]` để ngắt nghỉ có chủ ý; thẻ này (và tag cảm xúc) không hiện trong phụ đề.
   - `"lexicon": {"GPT": "gi pi ti"}` dạy cách đọc từ viết tắt.

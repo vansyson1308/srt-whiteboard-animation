@@ -251,7 +251,7 @@ def test_vieneu_moods_retime_the_audio(monkeypatch, tmp_path):
     text = "Nước Đức in tiền mỗi ngày. Người mẹ già ngồi khóc mãi."
     span = lambda ws: ws[-1].endMs - ws[0].startMs  # noqa: E731
     r = tts.synthesize(text, tmp_path / "m.mp3", "vieneu", style="natural")
-    assert span(r.words[6:]) > 1.1 * span(r.words[:6])               # the sad line is read slower
+    assert span(r.words[6:]) > 1.05 * span(r.words[:6])              # the sad line is read slower
     flat = tts.synthesize(text, tmp_path / "f.mp3", "vieneu", style="natural", expressiveness=0)
     assert abs(span(flat.words[6:]) - span(flat.words[:6])) < 60
 
