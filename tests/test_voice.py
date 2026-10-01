@@ -362,3 +362,18 @@ def test_unavailable_engine_falls_back_to_edge(monkeypatch, tmp_path):
                              tmp_path, 200, None, tmp_path)
     assert seen == {"engine": "edge", "voice": "vi-VN-NamMinhNeural"}
     assert v.words[0].startMs == 200
+
+
+def test_block_fft_filter_matches_one_shot_and_envelope_is_exact():
+    sr = wb_video.SAMPLE_RATE
+    x = (np.random.default_rng(4).standard_normal((sr * 3, 2)) * 0.2).astype(np.float32)
+    lp = lambda f: 1 / np.sqrt(1 + (f / 2000.0) ** 4)  # noqa: E731
+    ref = np.fft.irfft(np.fft.rfft(x.astype(np.float64), axis=0) * lp(np.fft.rfftfreq(len(x), 1 / sr))[:, None],
+                       n=len(x), axis=0)
+    got = wb_video.fft_filter(x, lp, block=1 << 15, pad=1 << 12)       # many small blocks
+    mid = slice(sr // 10, -sr // 10)                                    # the one-shot FFT wraps around at the ends
+    assert got.shape == x.shape and np.abs(got[mid] - ref[mid]).max() < 1e-3
+    m = x[:, 0]
+    env = np.sqrt(np.convolve(m.astype(np.float64) ** 2, np.ones(2400) / 2400, mode="same"))
+    assert np.allclose(wb_video.rms_envelope(m), env, atol=1e-9)
+    assert abs(wb_video.loudness_lufs(x) - wb_video.loudness_lufs(x * 2) + 6.02) < 0.05

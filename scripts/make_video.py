@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import gc
 import hashlib
 import json
 import math
@@ -405,10 +406,8 @@ def pen_sfx(activity: np.ndarray, fps: int, n_samples: int, seed: int = 7) -> np
         return np.zeros((n_samples, 2), np.float32)
     rng = np.random.default_rng(seed)
     noise = rng.standard_normal(n_samples).astype(np.float32)
-    f = np.fft.rfftfreq(n_samples, 1 / SR)
-    spec = np.fft.rfft(noise)
-    band = np.exp(-((np.log(np.maximum(f, 1)) - np.log(3800)) ** 2) / (2 * 0.55 ** 2))
-    noise = np.fft.irfft(spec * band, n=n_samples).astype(np.float32)
+    noise = wv.fft_filter(noise, lambda f: np.exp(-((np.log(np.maximum(f, 1)) - np.log(3800)) ** 2)
+                                                  / (2 * 0.55 ** 2)))
     noise /= max(1e-6, float(np.std(noise)))
     spf = SR / fps
     env = np.repeat(np.clip(activity, 0, 1), int(round(spf)))[:n_samples]
@@ -563,8 +562,21 @@ def compose(fmt: str, proj: dict, scenes: list[dict], words_abs: list[tts.Word],
 # ──────────────────────────────────────────────────────────────
 # main pipeline
 # ──────────────────────────────────────────────────────────────
+def clean_build(bdir: Path) -> float:
+    """Delete the large, cheap-to-rebuild intermediates (per-scene renders, scene PNGs);
+    keep the voice and music caches, which are slow to regenerate.  Returns MB freed."""
+    freed = 0
+    for sub in ("render", "scenes"):
+        d = bdir / sub
+        if d.exists():
+            freed += sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
+            shutil.rmtree(d)
+    return round(freed / 2**20, 1)
+
+
 def run(project_path: Path, formats: list[str] | None = None, draft: bool = False, only: list[str] | None = None,
-        jobs: int | None = None, engine_override: str | None = None, no_cache: bool = False) -> dict:
+        jobs: int | None = None, engine_override: str | None = None, no_cache: bool = False,
+        cleanup: bool = False) -> dict:
     t_start = time.time()
     pdir = project_path.parent.resolve()
     proj = load_project(project_path)
@@ -598,6 +610,7 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
                   for s in scenes_cfg]
     else:
         voices = [SceneVoice(None, [], 0) for _ in scenes_cfg]
+    tts.release_models()                       # the voice model is not needed any more
 
     # 3. sync
     log("-- sync")
@@ -673,6 +686,10 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
     # 6. audio
     log("-- audio")
     audio = build_audio(voices, scene_frames, fps, proj, pdir, activities)
+    for v in voices:                           # mixed: free the per-scene tracks before encoding
+        v.audio = None
+    del activities
+    gc.collect()
     if audio is not None:
         log(f"  mixed {len(audio) / SR:.2f}s, loudness {wv.loudness_lufs(audio):.1f} LUFS")
 
@@ -697,6 +714,9 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
             + (f", {rep.get('loudnessLUFS')} LUFS" if rep.get("hasAudio") else ""))
     if words_abs:
         report["srt"] = str(srt_path)
+    if cleanup:
+        report["cleanedMB"] = clean_build(bdir)
+        log(f"-- cleanup: freed {report['cleanedMB']} MB of intermediate renders")
     report["elapsedSec"] = round(time.time() - t_start, 1)
     (odir / f"{name}-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report
@@ -734,6 +754,8 @@ def main(argv=None) -> int:
     ap.add_argument("--engine", default=None, choices=tts.ENGINES,
                     help="override the TTS engine (e.g. silent for offline tests)")
     ap.add_argument("--no-cache", action="store_true")
+    ap.add_argument("--cleanup", action="store_true",
+                    help="after a successful build, delete per-scene renders (keeps voice/music caches)")
     ap.add_argument("--init", default=None, metavar="DIR", help="create a new project skeleton")
     a = ap.parse_args(argv)
     if a.init:
@@ -744,7 +766,8 @@ def main(argv=None) -> int:
         ap.error("project is required")
     split = lambda s: [x.strip() for x in s.split(",") if x.strip()] if s else None  # noqa: E731
     try:
-        rep = run(Path(a.project), split(a.formats), a.draft, split(a.scenes), a.jobs, a.engine, a.no_cache)
+        rep = run(Path(a.project), split(a.formats), a.draft, split(a.scenes), a.jobs, a.engine, a.no_cache,
+                  a.cleanup)
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         print(f"[err] {e}", file=sys.stderr)
         return 1

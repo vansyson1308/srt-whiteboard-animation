@@ -225,6 +225,12 @@ Script cắt video thành các phần ≤ 14 MB, không nén lại, rồi tạo 
 Agent publish trang này thành một Artifact riêng tư với capability `downloads`. Mỗi lượt publish ≤ 60 MB; các lượt sau dùng cùng trang và cộng dồn file.
 Người dùng mở link rồi bấm **Tải video**: trang ghép lại đúng từng byte, kiểm tra SHA-256 và phát. Bấm **Lưu video (.mp4)** để lưu bản gốc về máy.
 
+### Video dài: bộ nhớ và dung lượng
+
+- **RAM:** âm thanh được lọc theo khối FFT cố định (`wb_video.fft_filter`), nên RAM không tăng theo độ dài video. Video 15 phút chỉ cần khoảng 4 GB ở bước trộn. Trước đây FFT trên cả track có thể ngốn hơn 12 GB.
+- **Giải phóng sớm:** model VieNeu và audio từng cảnh được giải phóng ngay khi không còn cần.
+- **`--cleanup`:** xoá các bản render từng cảnh và ảnh trung gian sau khi xuất xong, giữ cache giọng đọc và nhạc.
+
 ### Xử lý sự cố
 
 | Triệu chứng | Cách xử lý |
@@ -235,6 +241,7 @@ Người dùng mở link rồi bấm **Tải video**: trang ghép lại đúng t
 | vùng vẽ sai (ảnh raster) | mở `assets/preview.html`, chỉnh vùng, lưu, chạy lại |
 | muốn làm lại từ đầu | `--no-cache` hoặc xoá `build/` |
 | video quá lớn để gửi qua chat | `scripts/share_video.py` (xem trên) |
+| tiến trình bị `Killed` khi xuất video dài | thiếu RAM: cập nhật repo (bản lọc theo khối), chạy lại để dùng cache |
 
 ### Quy trình cũ (SRT + ảnh + chỉnh tay) vẫn dùng được
 

@@ -80,6 +80,9 @@ $PY scripts/share_video.py projects/<slug>/out/<slug>-landscape.mp4 --title "Tê
 ```
 Script cắt file thành các phần ≤ 14 MB (`share-<tên>/parts/`), tạo `index.html` và in các lượt publish. Publish `index.html` bằng Artifact tool, kèm `files` của lượt 1, `capabilities: {"downloads": true}` và `icon: "video"`. Các lượt sau publish lại **cùng file_path** chỉ với `files` còn lại (file được cộng dồn). Trang tự ghép các phần, kiểm tra SHA-256, phát video và có nút **Lưu video (.mp4)** để tải bản gốc, không nén lại. Trang là riêng tư; không đưa video lên repo.
 
+### 7. Dọn dẹp sau khi giao (video dài)
+Sau khi người dùng đã nhận video, giải phóng dung lượng: `$PY scripts/make_video.py <dự án>/video.json --cleanup` (hoặc thêm `--cleanup` ngay lần xuất cuối). Lệnh này xoá các bản render từng cảnh và PNG trung gian, giữ cache giọng đọc và nhạc (tốn thời gian tạo lại). Xoá luôn thư mục `out/share-*/parts` sau khi đã publish. Video 15 phút cần ~4 GB RAM ở bước trộn âm thanh; model VieNeu được giải phóng ngay sau bước giọng đọc.
+
 ## Tuỳ chọn hay dùng trong `video.json`
 
 | Muốn | Đặt |
