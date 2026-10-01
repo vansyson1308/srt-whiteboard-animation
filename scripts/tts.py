@@ -818,7 +818,12 @@ def _speech_span(audio_path: Path) -> tuple[int, int, int]:
 SENTENCE_ENGINES = {"edge", "tiktok", "gemini", "vieneu"}
 # engines without prosody controls: moods are applied to the audio (tempo/pitch/gain)
 PROSODY_DSP_ENGINES = {"vieneu", "tiktok", "makevoice", "fish"}
-PROSODY_VERSION = 1          # bump when mood planning / DSP changes (invalidates voice caches)
+# How much of a mood's tempo change is applied by DSP.  Small WSOLA changes are transparent;
+# large ones start to sound processed.  Pitch is NOT shifted by DSP: resampling moves the
+# formants too, so the narrator's timbre would change from sentence to sentence.  For these
+# engines a mood is carried by tempo, loudness, crescendo and the pauses around the sentence.
+DSP_TEMPO_SCALE = 0.6
+PROSODY_VERSION = 2          # bump when mood planning / DSP changes (invalidates voice caches)
 BLOCK_CHARS = {"gemini": 1500, "openai": 1500, "makevoice": 1500, "fish": 1500, "vieneu": 600}
 PARALLEL = {"edge": 4, "tiktok": 3, "gemini": 3, "openai": 3, "makevoice": 2, "fish": 2, "vieneu": 1}
 
@@ -839,8 +844,11 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
     tag, the scene ``mood``, or read from its words (``auto_mood``) - that sets its tempo,
     pitch, loudness and the pauses around it, scaled by ``expressiveness`` (0 = flat).
     Edge plays them through SSML prosody; engines without prosody controls (vieneu, tiktok,
-    makevoice, fish) are re-timed and re-pitched per sentence (WSOLA); gemini/openai get a
-    spoken direction per sentence."""
+    makevoice, fish) get gentle per-sentence tempo (WSOLA), loudness and pause changes (no DSP
+    pitch shift, which would alter the timbre); gemini/openai get a spoken direction per sentence.
+
+    Foreign names: write them in their own spelling.  VieNeu's G2P detects English words and
+    reads them in English; a Vietnamese respelling in ``lexicon`` forces a Vietnamese reading."""
     import wb_video
     if engine not in ENGINES:
         raise ValueError(f"unknown TTS engine: {engine} (choose from {', '.join(ENGINES)})")
@@ -928,7 +936,7 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
             pcm = wb_video.load_audio(f, stereo=False)
             f.unlink(missing_ok=True)
         if engine in PROSODY_DSP_ENGINES and same:
-            pcm = wb_video.apply_prosody(pcm, s0.mood_rate, s0.mood_st, s0.gain_db, s0.ramp_db)
+            pcm = wb_video.apply_prosody(pcm, s0.mood_rate * DSP_TEMPO_SCALE, 0.0, s0.gain_db, s0.ramp_db)
         return Clip(pcm, anchor_words(disp, pcm), s0.pause_before_ms)
 
     try:

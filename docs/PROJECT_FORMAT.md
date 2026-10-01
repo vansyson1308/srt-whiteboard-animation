@@ -20,7 +20,7 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
     "mood": null,                            // cảm xúc mặc định: fast | slow | climax | emotional | suspense | happy | neutral
     "expressiveness": 1.0,                   // độ đậm của điều tiết cảm xúc: 0 = đọc phẳng … 1 = mặc định … 2 = rất đậm
     "autoMood": true,                        // tự đọc cảm xúc từng câu từ nội dung (tag [cao trào]… luôn thắng)
-    "lexicon": {"GPT": "gi pi ti"},          // cách đọc từ viết tắt / tên riêng
+    "lexicon": {"GPT": "gi pi ti"},          // cách đọc từ viết tắt; tên tiếng Anh để nguyên (VieNeu tự đọc kiểu Anh)
     "instructions": null,                    // gemini/openai: tự mô tả giọng điệu (thay cho style)
     "reference": null, "referenceText": null, "confirmAuthorizedVoice": false   // fish: clone giọng có sự đồng ý
   },
@@ -111,4 +111,4 @@ Mỗi câu được đọc với một "mood" quyết định tốc độ, cao �
 - Không có tag thì câu được **tự đọc cảm xúc** từ từ ngữ và dấu câu (`!` → cao trào, `…` → hồi hộp, "đau khổ", "nước mắt" → xúc động, "bản chất", "tóm lại" → nhấn; câu kết ngắn của cảnh → chậm lại). Cảm xúc buồn/hồi hộp còn "vương" nhẹ sang câu kế tiếp.
 - Agent viết kịch bản nên tự đặt tag cho các câu then chốt (hook, cú lật, cao trào, đoạn xúc động, câu chốt): hiểu nội dung tốt hơn luật từ khoá.
 - Xem trước cách đọc (không cần mạng): `$PY scripts/voice_studio.py "Lời thoại…" --style podcast`.
-- Edge đọc bằng SSML prosody; VieNeu, TikTok, MakeVoice, Fish được chỉnh tốc độ/cao độ bằng xử lý âm thanh (WSOLA, giữ nguyên chất giọng); Gemini/OpenAI nhận thêm lời chỉ dẫn giọng cho từng câu. ElevenLabs (đọc một lượt) chưa áp dụng.
+- Edge đọc bằng SSML prosody (đổi được cả cao độ). VieNeu, TikTok, MakeVoice, Fish được chỉnh nhẹ tốc độ (WSOLA, 60% mức của bảng), độ to và khoảng nghỉ. Không dịch cao độ bằng xử lý âm thanh, vì dịch như vậy làm đổi âm sắc giọng đọc; Gemini/OpenAI nhận thêm lời chỉ dẫn giọng cho từng câu. ElevenLabs (đọc một lượt) chưa áp dụng.
