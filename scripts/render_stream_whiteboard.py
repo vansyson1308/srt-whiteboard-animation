@@ -808,8 +808,9 @@ class SceneRenderer:
                 out_t.append(ftl)
         return out_p, out_t
 
-    # ── main loop ──
-    def render(self, sink, total_ms: int | None = None) -> int:
+    def schedule(self, total_ms: int | None = None) -> tuple[list, list, int]:
+        """Plan every element and decide its frames: (plans, [start frame, frames] per plan,
+        total frames).  No pixels are drawn, so this is cheap enough for sync checks."""
         o = self.opts
         fps = o.fps
         els = sorted(self.ann.get("elements", []),
@@ -831,7 +832,6 @@ class SceneRenderer:
             for e in els:
                 e["reveal"]["startMs"] = int(e["reveal"]["startMs"] * k)
                 e["reveal"]["durationMs"] = max(200, int(e["reveal"]["durationMs"] * k))
-        wsum = o.ink_weight + (0 if o.color_fill == "none" else o.color_weight)
         # data-filler doodles are not tied to the narration: they fill long pauses (below)
         fillers = [e for e in els if e.get("filler")]
         mains = [e for e in els if not e.get("filler")]
@@ -852,6 +852,29 @@ class SceneRenderer:
             plans, timeline = self._place_fillers(plans, timeline, plan(fillers, mains), total_f, to_f)
         if o.verbose:
             print(f"  planned {len(plans)} elements in {time.time() - t0:.1f}s")
+        return plans, timeline, total_f
+
+    def sync_report(self, plans: list, timeline: list) -> list[dict]:
+        """Per narrated element: when its phrase is spoken vs when the pen draws it (ms)."""
+        fps = self.opts.fps
+        out = []
+        for pl, (start, use) in zip(plans, timeline):
+            el = pl[0]
+            if el.get("filler") or el["reveal"].get("sayMs") is None:
+                continue
+            out.append({"id": el.get("id"), "label": el.get("label"), "sayMs": int(el["reveal"]["sayMs"]),
+                        "drawStartMs": int(round(start * 1000 / fps)), "drawEndMs": int(round((start + use) * 1000 / fps)),
+                        "naturalMs": int(round((pl[7] + pl[8]) * 1000))})
+        return out
+
+    # ── main loop ──
+    def render(self, sink, total_ms: int | None = None) -> int:
+        o = self.opts
+        fps = o.fps
+        to_f = lambda ms: int(round(ms * fps / 1000.0))  # noqa: E731
+        wsum = o.ink_weight + (0 if o.color_fill == "none" else o.color_weight)
+        plans, timeline, total_f = self.schedule(total_ms)
+        self.sync = self.sync_report(plans, timeline)
 
         f = 0
         hand_xy = None
@@ -943,8 +966,8 @@ def render_scene(image: str | Path, annotation: dict | str | Path, output: str |
     with VideoSink(out, opts.width, opts.height, opts.fps, crf=opts.crf, preset=opts.preset) as sink:
         n = r.render(sink, total_ms)
     if activity_path:
-        Path(activity_path).write_text(json.dumps({"fps": opts.fps, "activity": [round(a, 2) for a in r.activity]}),
-                                       encoding="utf-8")
+        Path(activity_path).write_text(json.dumps({"fps": opts.fps, "activity": [round(a, 2) for a in r.activity],
+                                                   "sync": getattr(r, "sync", [])}), encoding="utf-8")
     if opts.verbose:
         print(f"  {n} frames ({n / opts.fps:.2f}s) in {time.time() - t0:.1f}s -> {out}")
     return out
