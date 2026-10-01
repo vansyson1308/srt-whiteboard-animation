@@ -5,8 +5,12 @@ Voice-sync scheduling: decide when each element is drawn from word timings.
 Rules (all times are relative to the scene start):
   * an element with ``say`` (a phrase from the narration) starts drawing a
     little before that phrase is spoken - "draw it when you say it";
+  * elements are drawn in the order they are spoken, whatever their order in
+    the scene file;
   * elements without ``say`` are spread over the narration between the
     anchored ones, snapping to sentence starts when possible;
+  * the first element starts almost at once (the board is never empty for
+    long), but no more than ``first_early_max_ms`` before its own phrase;
   * each element draws until shortly before the next one starts, clamped to
     [minDrawMs, maxDrawMs] so the pen never crawls or rushes;
   * the scene lasts until the voice ends + a short hold;
@@ -31,6 +35,7 @@ class SyncOptions:
     min_draw_ms: int = 900
     max_draw_ms: int = 4500
     first_start_ms: int | None = 150  # first element starts almost immediately (hook); None = follow `say`
+    first_early_max_ms: int = 1500    # ... but at most this long before its own phrase
     tail_ms: int = 700          # hold after the voice ends
 
 
@@ -66,8 +71,8 @@ def schedule(elements: list[dict], words: list[Word], speech_end_ms: int | None 
              opts: SyncOptions | None = None) -> int:
     """Set ``reveal.startMs`` / ``durationMs`` of every element in place.
 
-    Elements are drawn in their list order (``sequence``).  Returns the scene
-    duration in ms.
+    Spoken elements are drawn in the order they are spoken; the others follow their
+    list order (``sequence``).  Returns the scene duration in ms.
     """
     o = opts or SyncOptions()
     end_ms = speech_end_ms if speech_end_ms is not None else (words[-1].endMs if words else 0)
@@ -94,15 +99,22 @@ def schedule(elements: list[dict], words: list[Word], speech_end_ms: int | None 
                 k = find_phrase(words, phrase, 0)
             if k is not None:
                 anchors[i] = max(0, words[k].startMs - o.lead_ms)
+                e.setdefault("reveal", {}).update(sayMs=int(words[k].startMs), sayWord=k)
                 cursor = k
                 if not e.get("subtitle"):
                     e["subtitle"] = _sentence_around(words, k)
-    if o.first_start_ms is not None:     # hook: the board is never empty for long
-        anchors[0] = min(anchors[0], o.first_start_ms) if anchors[0] is not None else o.first_start_ms
+    if o.first_start_ms is not None:     # hook: the board is never empty for long ...
+        if anchors[0] is None:
+            anchors[0] = o.first_start_ms
+        else:                            # ... but the opening drawing never runs far ahead of its words
+            i0 = min((i for i, a in enumerate(anchors) if a is not None), key=lambda i: anchors[i])
+            if anchors[i0] > o.first_start_ms:
+                anchors[i0] = max(o.first_start_ms, anchors[i0] - o.first_early_max_ms)
     elif anchors[0] is None:
         anchors[0] = 0
+    spoken = [a is not None for a in anchors]
 
-    # 2) fill the gaps between anchors
+    # 2) fill the gaps between anchors (elements without `say`, in list order)
     known = [i for i, a in enumerate(anchors) if a is not None]
     sent = [words[k].startMs for k in sentence_starts(words)] if words else []
     for ki, i in enumerate(known):
@@ -111,19 +123,25 @@ def schedule(elements: list[dict], words: list[Word], speech_end_ms: int | None 
             continue
         a0 = anchors[i]
         a1 = anchors[j] if j < n else max(a0 + (j - i) * o.min_draw_ms, end_ms - o.min_draw_ms)
+        a1 = max(a1, a0 + (j - i) * o.min_draw_ms // 2)
         for m in range(i + 1, j):
             t = a0 + (a1 - a0) * (m - i) / (j - i)
             # snap to a nearby sentence start (feels intentional)
             near = [s for s in sent if abs(s - t) < 900 and a0 < s < a1]
             anchors[m] = int(min(near, key=lambda s: abs(s - t)) - o.lead_ms if near else t)
-    # keep monotonic
+    # Elements are drawn when they are spoken: an element whose phrase comes earlier in the
+    # narration than its place in the list is drawn earlier (the renderer orders by start).
+    # Only unspoken elements are kept in list order behind the element before them.
     for i in range(1, n):
-        anchors[i] = max(anchors[i], anchors[i - 1] + o.min_draw_ms // 2)
+        if not spoken[i]:
+            anchors[i] = max(anchors[i], anchors[i - 1] + o.min_draw_ms // 2)
 
-    # 3) durations
-    for i, e in enumerate(els):
+    # 3) durations: until the next element in drawing order starts
+    order = sorted(range(n), key=lambda i: (anchors[i], i))
+    for pos, i in enumerate(order):
+        e = els[i]
         start = int(anchors[i])
-        nxt = anchors[i + 1] if i + 1 < n else max(end_ms, start + o.min_draw_ms)
+        nxt = anchors[order[pos + 1]] if pos + 1 < n else max(end_ms, start + o.min_draw_ms)
         dur = int(max(o.min_draw_ms, min(o.max_draw_ms, nxt - start - o.gap_ms)))
         rv = e.setdefault("reveal", {})
         rv["startMs"] = start

@@ -41,10 +41,11 @@ Tạo `projects/<slug>/video.json` + `scenes/`. (Mẫu hoàn chỉnh: `examples/
 ### 3. Vẽ từng cảnh bằng SVG
 Đọc **docs/SVG_GUIDE.md** trước khi vẽ. Tóm tắt:
 - `viewBox="0 0 1600 900"` (dùng chung 16:9 và 9:16) hoặc `0 0 1080 1350` nếu chỉ làm TikTok.
-- Mỗi `<g id=… data-label=… data-say="cụm từ trong lời thoại">` cấp cao nhất là một phần tử; thứ tự trong file = thứ tự vẽ; 3–6 phần tử/cảnh.
+- Mỗi `<g id=… data-label=… data-say="cụm từ trong lời thoại">` cấp cao nhất là một phần tử; phần tử được vẽ **theo thứ tự cụm từ được nói** (phần tử không có `data-say` theo thứ tự trong file); 3–6 phần tử/cảnh.
 - `data-say` phải **xuất hiện nguyên văn** trong `narration` của cảnh đó.
 - Nét `#2b2b2b` dày 5–8, bo tròn; nhấn cam/đỏ/xanh; font `Patrick Hand`; nhiều khoảng trắng; chữ trong cảnh chỉ là nhãn ngắn.
-- Phần tử đầu tiên nên là thứ "hút mắt" nhất (câu hỏi, con số, hình lạ).
+- Phần tử đầu tiên nên là thứ "hút mắt" nhất (câu hỏi, con số, hình lạ), gắn với những chữ đầu của lời thoại: nó được vẽ ngay, nhưng không sớm hơn cụm từ của nó quá 1,5 giây.
+- Bút giữ tốc độ tự nhiên. Hình nặng (đám đông, đường ray, nhiều chữ) cần thời gian: để cụm từ của phần tử kế tiếp cách đủ xa, hoặc giản lược hình.
 - Bàn tay vẽ với tốc độ tự nhiên rồi rút khỏi khung trong lúc chờ phần tử sau. Nếu một cảnh có quãng nói dài (> 3 giây) mà không có gì mới để vẽ, thêm phần tử có `data-say` cho quãng đó, hoặc 1–2 hình trang trí `data-filler="1"` (bóng đèn, ngôi sao, gạch chân phụ…) – renderer tự vẽ chúng vào khoảng nghỉ.
 
 Kiểm tra từng cảnh (nhìn ảnh bằng công cụ đọc ảnh của bạn):
@@ -60,6 +61,12 @@ Sửa SVG nếu: phần tử đè lên nhau khó đọc, chữ tràn khung, bố
 ```bash
 $PY scripts/make_video.py projects/<slug>/video.json --draft
 ```
+Kiểm tra nhanh độ khớp hình–tiếng mà không cần render (chỉ tổng hợp giọng + lập lịch, ~1 phút sau khi có giọng):
+```bash
+$PY scripts/make_video.py projects/<slug>/video.json --sync-check
+```
+Log `sync:` cho biết bút đặt xuống sớm/trễ bao nhiêu so với lúc nói cụm từ (trung vị nên ≈ −0.2 s… −0.4 s) và liệt kê các phần tử trễ nhất; chi tiết ở `out/<name>-sync.json`. Báo cáo `*-report.json` của mỗi lần xuất cũng có mục `sync`. (Đừng chạy hai lệnh `make_video` cùng lúc trên một dự án.)
+
 Mở `out/*-draft-qa.jpg` và đọc log `-- sync` (mỗi phần tử bắt đầu lúc nào). Kiểm tra:
 - khung 0s–2s đã có nét đang vẽ (hook);
 - mỗi phần tử xuất hiện đúng lúc nói tới nó (log sync ≈ thời điểm của cụm từ);

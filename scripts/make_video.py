@@ -55,7 +55,7 @@ import svg_scene  # noqa: E402
 import timing  # noqa: E402
 import tts  # noqa: E402
 import wb_video as wv  # noqa: E402
-from render_stream_whiteboard import RenderOptions, render_scene  # noqa: E402
+from render_stream_whiteboard import RenderOptions, SceneRenderer, load_label_map, render_scene  # noqa: E402
 
 FORMATS = {"landscape": (1920, 1080), "portrait": (1080, 1920), "square": (1080, 1080)}
 # renders are cached by content; include the renderer's own code so code changes invalidate the cache
@@ -63,6 +63,8 @@ RENDERER_HASH = hashlib.sha256(b"".join(
     (SCRIPTS / f).read_bytes() for f in ("render_stream_whiteboard.py", "stream_render.py"))).hexdigest()[:16]
 SVG_BUILDER_HASH = hashlib.sha256((SCRIPTS / "svg_scene.py").read_bytes()).hexdigest()[:16]
 SR = wv.SAMPLE_RATE
+MAX_TAIL_EXTRA_MS = 1200  # a scene may run this much past its narration so its last drawing isn't rushed
+SYNC_LATE_MS = 400       # pen down this long after its phrase is spoken reads as "drawing lags the voice"
 
 
 # ──────────────────────────────────────────────────────────────
@@ -327,6 +329,20 @@ def master_size(image: Path, long_edge: int) -> tuple[int, int]:
     return max(2, int(round(w * s / 2)) * 2), max(2, int(round(h * s / 2)) * 2)
 
 
+def render_opts(rcfg: dict, w: int, h: int, fps: int, draft: bool, pdir: Path) -> dict:
+    opts = dict(width=w, height=h, fps=fps, ink_path=rcfg["inkPath"], color_fill=rcfg["colorFill"],
+                camera=rcfg["camera"], camera_max_zoom=float(rcfg["cameraMaxZoom"]),
+                paper_hex=rcfg["paper"], hand_height_ratio=float(rcfg["handHeightRatio"]),
+                human_motion=bool(rcfg["humanMotion"]), pen_lift=float(rcfg["penLift"]),
+                idle_hand=str(rcfg["idleHand"]), draw_speed=float(rcfg["drawSpeed"]),
+                crf=24 if draft else 14, preset="ultrafast" if draft else "veryfast", verbose=False)
+    if rcfg.get("hand"):
+        opts["hand"] = str((pdir / rcfg["hand"]).resolve())
+    elif rcfg.get("hand") is False:
+        opts["hand"] = None
+    return opts
+
+
 def _render_job(job: dict) -> dict:
     opts = RenderOptions(**job["opts"])
     t0 = time.time()
@@ -354,6 +370,44 @@ def render_scenes(jobs: list[dict], max_workers: int) -> None:
         for f in as_completed(futs):
             r = f.result()
             log(f"  [{r['id']}] rendered in {r['sec']:.1f}s")
+
+
+def _plan_job(job: dict) -> dict:
+    """Plan a scene exactly as the renderer would, without drawing anything: per-element sync
+    rows and when the pen is done.  With ``extend`` the scene is planned as if it had all the
+    time it wants, i.e. the time its last drawing needs at a natural pace."""
+    opts = replace(RenderOptions(**job["opts"]), verbose=False)
+    r = SceneRenderer(sr._imread_any(job["image"]), copy.deepcopy(job["annotation"]), opts,
+                      label_map=load_label_map(job["annotation"], Path(job["base"])))
+    plans, timeline, _ = r.schedule(job["total_ms"] + (60_000 if job.get("extend") else 0))
+    end_f = max((s0 + n for s0, n in timeline), default=0)
+    return {"rows": r.sync_report(plans, timeline), "drawEndMs": int(end_f * 1000 / opts.fps),
+            "fadeMs": opts.final_fade_ms}
+
+
+def sync_stats(rows_by_scene: dict[str, list[dict]]) -> dict:
+    """How well drawing follows the narration.  ``offsetMs`` = pen down minus the moment the
+    element's phrase is spoken (negative: the pen starts a little ahead, as intended)."""
+    rows = [dict(r, scene=sid, offsetMs=r["drawStartMs"] - r["sayMs"])
+            for sid, rr in rows_by_scene.items() for r in rr]
+    if not rows:
+        return {"elements": 0}
+    off = np.array([r["offsetMs"] for r in rows], np.float64)
+    late = [r for r in rows if r["offsetMs"] > SYNC_LATE_MS]
+    return {"elements": len(rows), "medianOffsetMs": int(np.median(off)),
+            "p90AbsOffsetMs": int(np.percentile(np.abs(off), 90)), "maxLateMs": int(max(0, off.max())),
+            "late": len(late), "lateThresholdMs": SYNC_LATE_MS,
+            "worst": [{k: r[k] for k in ("scene", "label", "offsetMs")}
+                      for r in sorted(rows, key=lambda r: -r["offsetMs"])[:8] if r["offsetMs"] > 0]}
+
+
+def log_sync(st: dict) -> None:
+    if not st.get("elements"):
+        return
+    log(f"  sync: {st['elements']} narrated elements, median pen-down {st['medianOffsetMs']:+d} ms vs the "
+        f"spoken phrase, p90 |offset| {st['p90AbsOffsetMs']} ms, {st['late']} late (> {st['lateThresholdMs']} ms)")
+    for w in st["worst"][:5]:
+        log(f"    late {w['offsetMs']:+5d} ms  {w['scene']} / {w['label']}")
 
 
 # ──────────────────────────────────────────────────────────────
@@ -576,7 +630,7 @@ def clean_build(bdir: Path) -> float:
 
 def run(project_path: Path, formats: list[str] | None = None, draft: bool = False, only: list[str] | None = None,
         jobs: int | None = None, engine_override: str | None = None, no_cache: bool = False,
-        cleanup: bool = False) -> dict:
+        cleanup: bool = False, sync_check: bool = False) -> dict:
     t_start = time.time()
     pdir = project_path.parent.resolve()
     proj = load_project(project_path)
@@ -639,9 +693,29 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
         (bdir / "scenes" / f"{sc['id']}.scheduled.json").write_text(
             json.dumps({k: v2 for k, v2 in ann.items()}, ensure_ascii=False, indent=1), encoding="utf-8")
 
+    long_edge = 960 if draft else 1920
+    # the last drawing of a scene is often spoken near the end of its narration: give the
+    # scene the extra moment it needs instead of rushing the pen
+    if rcfg.get("idleHand", "exit") == "exit":
+        tjobs = [(i, {"image": str(img), "annotation": ann, "base": str(base), "total_ms": ms, "extend": True,
+                      "opts": render_opts(rcfg, *master_size(img, long_edge), fps, draft, pdir)})
+                 for i, (sc, (img, ann, base), v, ms) in enumerate(zip(scenes_cfg, assets, voices, durations))
+                 if v.words and not v.fixed_ms and not sc.get("keepTiming")]
+        if tjobs:
+            with ProcessPoolExecutor(max_workers=max(1, min(jobs or (os.cpu_count() or 2), len(tjobs)))) as ex:
+                plans = list(ex.map(_plan_job, [j for _, j in tjobs]))
+            extra = 0
+            for (i, _), pl in zip(tjobs, plans):
+                need = min(pl["drawEndMs"] + pl["fadeMs"] + 500, durations[i] + MAX_TAIL_EXTRA_MS)
+                if need > durations[i]:
+                    extra += need - durations[i]
+                    durations[i] = need
+                    assets[i][1]["sceneDurationMs"] = need
+            if extra:
+                log(f"  +{extra / 1000:.1f}s so last drawings finish at a natural pace")
+
     # 4. render
     log("-- render")
-    long_edge = 960 if draft else 1920
     rdir = bdir / "render"
     rdir.mkdir(exist_ok=True)
     jobs_list = []
@@ -649,16 +723,7 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
     for sc, (img, ann, base), ms in zip(scenes_cfg, assets, durations):
         w, h = master_size(img, long_edge)
         aspects.append(w / h)
-        opts = dict(width=w, height=h, fps=fps, ink_path=rcfg["inkPath"], color_fill=rcfg["colorFill"],
-                    camera=rcfg["camera"], camera_max_zoom=float(rcfg["cameraMaxZoom"]),
-                    paper_hex=rcfg["paper"], hand_height_ratio=float(rcfg["handHeightRatio"]),
-                    human_motion=bool(rcfg["humanMotion"]), pen_lift=float(rcfg["penLift"]),
-                    idle_hand=str(rcfg["idleHand"]), draw_speed=float(rcfg["drawSpeed"]),
-                    crf=24 if draft else 14, preset="ultrafast" if draft else "veryfast", verbose=False)
-        if rcfg.get("hand"):
-            opts["hand"] = str((pdir / rcfg["hand"]).resolve())
-        elif rcfg.get("hand") is False:
-            opts["hand"] = None
+        opts = render_opts(rcfg, w, h, fps, draft, pdir)
         mask_hash = file_hash(base / ann["maskFile"]) if ann.get("maskFile") else ""
         hand_file = opts["hand"] if "hand" in opts else RenderOptions().hand   # None = no hand
         hand_hash = file_hash(Path(hand_file)) if hand_file else ""
@@ -667,11 +732,23 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
                           "out": str(rdir / f"{sc['id']}-{key}.mp4"),
                           "activity": str(rdir / f"{sc['id']}-{key}.activity.json"),
                           "total_ms": ms, "opts": opts})
+    if sync_check:                             # plan only: report how drawing follows the voice
+        workers = max(1, min(jobs or (os.cpu_count() or 2), len(jobs_list)))
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            rows = {j["id"]: p["rows"] for j, p in zip(jobs_list, ex.map(_plan_job, jobs_list))}
+        st = sync_stats(rows)
+        log_sync(st)
+        (odir / f"{name}-sync.json").write_text(json.dumps({"stats": st, "scenes": rows}, ensure_ascii=False, indent=1),
+                                                encoding="utf-8")
+        return {"project": str(project_path), "sync": st, "outputs": []}
     render_scenes(jobs_list, jobs or (os.cpu_count() or 2))
 
     scene_frames = [int(round(ms * fps / 1000)) for ms in durations]
-    activities = [np.asarray(json.loads(Path(j["activity"]).read_text())["activity"], np.float32)
-                  for j in jobs_list]
+    act_json = [json.loads(Path(j["activity"]).read_text()) for j in jobs_list]
+    activities = [np.asarray(a["activity"], np.float32) for a in act_json]
+    sync = sync_stats({j["id"]: a.get("sync", []) for j, a in zip(jobs_list, act_json)})
+    log_sync(sync)
+    del act_json
 
     # absolute word timeline for captions
     words_abs: list[tts.Word] = []
@@ -697,7 +774,7 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
     import qa_frames
     report = {"project": str(project_path), "title": proj.get("title"), "durationSec": round(sum(scene_frames) / fps, 3),
               "scenes": [{"id": s["id"], "sec": round(nf / fps, 3)} for s, nf in zip(scenes_cfg, scene_frames)],
-              "outputs": []}
+              "sync": sync, "outputs": []}
     scenes_media = [{"video": j["out"], "frames": nf} for j, nf in zip(jobs_list, scene_frames)]
     aspect = float(np.median(aspects)) if aspects else 16 / 9
     for fmt in formats:
@@ -756,6 +833,8 @@ def main(argv=None) -> int:
     ap.add_argument("--no-cache", action="store_true")
     ap.add_argument("--cleanup", action="store_true",
                     help="after a successful build, delete per-scene renders (keeps voice/music caches)")
+    ap.add_argument("--sync-check", action="store_true",
+                    help="stop before rendering and report how the drawing follows the narration")
     ap.add_argument("--init", default=None, metavar="DIR", help="create a new project skeleton")
     a = ap.parse_args(argv)
     if a.init:
@@ -767,7 +846,7 @@ def main(argv=None) -> int:
     split = lambda s: [x.strip() for x in s.split(",") if x.strip()] if s else None  # noqa: E731
     try:
         rep = run(Path(a.project), split(a.formats), a.draft, split(a.scenes), a.jobs, a.engine, a.no_cache,
-                  a.cleanup)
+                  a.cleanup, a.sync_check)
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         print(f"[err] {e}", file=sys.stderr)
         return 1

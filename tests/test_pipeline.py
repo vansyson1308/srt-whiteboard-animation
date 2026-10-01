@@ -78,6 +78,32 @@ def test_schedule_hook_starts_immediately():
     assert els[0]["reveal"]["startMs"] <= 150
 
 
+def test_schedule_draws_in_spoken_order():
+    words = _words("Một đứa bé đứng cạnh cái giếng sâu.")
+    els = [{"sequence": 1, "say": "cái giếng"}, {"sequence": 2, "say": "đứa bé"}]   # listed out of order
+    timing.schedule(els, words, words[-1].endMs, timing.SyncOptions(first_start_ms=None))
+    well, kid = (e["reveal"] for e in els)
+    assert kid["startMs"] < well["startMs"]                       # drawn when spoken, not in list order
+    assert kid["sayMs"] == words[1].startMs and well["sayMs"] == words[5].startMs
+    assert kid["startMs"] + kid["durationMs"] <= well["startMs"]
+
+
+def test_schedule_hook_never_far_ahead_of_its_words():
+    words = _words(" ".join(["chữ"] * 12) + " mặt trời", step=400)
+    els = [{"sequence": 1, "say": "mặt trời"}]
+    timing.schedule(els, words, words[-1].endMs)
+    assert els[0]["reveal"]["startMs"] >= words[12].startMs - 250 - 1500
+
+
+def test_sync_stats_reports_late_drawings():
+    rows = {"s1": [{"label": "a", "sayMs": 1000, "drawStartMs": 750, "drawEndMs": 2000},
+                   {"label": "b", "sayMs": 2000, "drawStartMs": 2900, "drawEndMs": 3500}]}
+    import make_video
+    st = make_video.sync_stats(rows)
+    assert st["elements"] == 2 and st["late"] == 1 and st["maxLateMs"] == 900
+    assert st["worst"][0]["label"] == "b"
+
+
 def test_find_phrase_fuzzy():
     words = _words("hiện tượng tán xạ Rayleigh rất thú vị")
     assert timing.find_phrase(words, "tán xạ Rayleigh") == 2
