@@ -170,10 +170,47 @@ def save_wav(path: str | Path, a: np.ndarray, sample_rate: int = SAMPLE_RATE) ->
 
 
 def rms_envelope(a: np.ndarray, win_ms: float = 50.0) -> np.ndarray:
+    """Centred moving RMS (O(n) running sum, so hour-long tracks stay fast)."""
     mono = a.mean(axis=1) if a.ndim == 2 else a
     win = max(1, int(SAMPLE_RATE * win_ms / 1000))
-    power = np.convolve(mono ** 2, np.ones(win) / win, mode="same")
-    return np.sqrt(power)
+    sq = np.zeros(len(mono) + win, np.float64)
+    sq[win // 2 + 1:win // 2 + 1 + len(mono)] = np.square(mono, dtype=np.float64)
+    c = np.cumsum(sq)
+    return np.sqrt(np.maximum((c[win:] - c[:-win]) / win, 0.0))
+
+
+FFT_BLOCK = 1 << 20          # ~22 s at 48 kHz
+FFT_PAD = 1 << 15            # ~0.68 s of context on each side of a block
+
+
+def fft_filter(x: np.ndarray, response, block: int = FFT_BLOCK, pad: int = FFT_PAD) -> np.ndarray:
+    """Zero-phase filter with magnitude ``response(freqs_hz)``, applied block by block.
+
+    Every FFT has the same power-of-two size, so memory stays bounded (tens of MB)
+    and time stays linear however long the track is.  A single FFT over an
+    arbitrary length can fall back to Bluestein's algorithm, which needs many GB
+    for a 15-minute track.  Each block is filtered with ``pad`` samples of real
+    context on both sides and only its middle is kept (overlap-save), which is
+    exact for responses whose impulse response is shorter than ``pad``.
+    """
+    x = np.asarray(x)
+    mono = x.ndim == 1
+    xx = x[:, None] if mono else x
+    n = len(xx)
+    out = np.empty(xx.shape, np.float32)
+    if n == 0:
+        return out[:, 0] if mono else out
+    nfft = block + 2 * pad
+    h = np.asarray(response(np.fft.rfftfreq(nfft, 1.0 / SAMPLE_RATE)), np.float64)[:, None]
+    seg = np.empty((nfft, xx.shape[1]), np.float64)
+    for s in range(0, n, block):
+        a, b = max(0, s - pad), min(n, s + block + pad)
+        seg[:] = 0.0
+        seg[:b - a] = xx[a:b]
+        y = np.fft.irfft(np.fft.rfft(seg, axis=0) * h, n=nfft, axis=0)
+        k = min(block, n - s)
+        out[s:s + k] = y[s - a:s - a + k]
+    return out[:, 0] if mono else out
 
 
 def duck_music(music: np.ndarray, voice: np.ndarray, base_gain_db: float = -18.0,
@@ -336,27 +373,28 @@ def fade(a: np.ndarray, in_ms: float = 0, out_ms: float = 0) -> np.ndarray:
     return a
 
 
-def _k_weight(x: np.ndarray) -> np.ndarray:
-    """ITU-R BS.1770 K-weighting applied in the frequency domain (magnitude only;
-    phase does not matter for a power measurement)."""
-    n = len(x)
-    f = np.fft.rfftfreq(n, 1.0 / SAMPLE_RATE)
+def _k_response(f: np.ndarray) -> np.ndarray:
     z = np.exp(-2j * np.pi * f / SAMPLE_RATE)
 
     def resp(b, a):
         return (b[0] + b[1] * z + b[2] * z * z) / (a[0] + a[1] * z + a[2] * z * z)
-    h = np.abs(resp([1.53512485958697, -2.69169618940638, 1.19839281085285],
-                    [1.0, -1.69065929318241, 0.73248077421585])
-               * resp([1.0, -2.0, 1.0], [1.0, -1.99004745483398, 0.99007225036621]))
-    return np.fft.irfft(np.fft.rfft(x, axis=0) * h[:, None], n=n, axis=0)
+    return np.abs(resp([1.53512485958697, -2.69169618940638, 1.19839281085285],
+                       [1.0, -1.69065929318241, 0.73248077421585])
+                  * resp([1.0, -2.0, 1.0], [1.0, -1.99004745483398, 0.99007225036621]))
+
+
+def _k_weight(x: np.ndarray) -> np.ndarray:
+    """ITU-R BS.1770 K-weighting applied in the frequency domain (magnitude only;
+    phase does not matter for a power measurement)."""
+    return fft_filter(x, _k_response)
 
 
 def loudness_lufs(a: np.ndarray) -> float:
     """Integrated loudness (BS.1770 K-weighting + absolute/relative gating)."""
-    x = (a if a.ndim == 2 else a[:, None]).astype(np.float64)
+    x = a if a.ndim == 2 else a[:, None]
     if len(x) == 0:
         return -70.0
-    y = _k_weight(x)
+    y = _k_weight(x).astype(np.float64)
     block, hop = int(0.4 * SAMPLE_RATE), int(0.1 * SAMPLE_RATE)
     sq = np.sum(y ** 2, axis=1)
     if len(sq) < block:

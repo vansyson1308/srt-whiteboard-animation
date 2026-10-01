@@ -516,6 +516,13 @@ def _vieneu_model():
     return _VIENEU["tts"]
 
 
+def release_models() -> None:
+    """Free loaded local TTS models (VieNeu holds ~1.5 GB) once the voice stage is done."""
+    import gc
+    _VIENEU.clear()
+    gc.collect()
+
+
 def vieneu_voices() -> list[str]:
     return [vid for _, vid in _vieneu_model().list_preset_voices()]
 

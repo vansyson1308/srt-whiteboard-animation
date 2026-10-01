@@ -61,9 +61,7 @@ def _add(buf: np.ndarray, x: np.ndarray, start: float, pan: float = 0.0, gain: f
 
 
 def _lowpass(a: np.ndarray, cutoff: float) -> np.ndarray:
-    f = np.fft.rfftfreq(len(a), 1 / SR)
-    h = 1 / np.sqrt(1 + (f / cutoff) ** 4)
-    return np.fft.irfft(np.fft.rfft(a, axis=0) * h[:, None], n=len(a), axis=0).astype(np.float32)
+    return wv.fft_filter(a, lambda f: 1 / np.sqrt(1 + (f / cutoff) ** 4))
 
 
 def generate(seconds: float, style: str = "calm", bpm: float | None = None, seed: int = 3) -> np.ndarray:
