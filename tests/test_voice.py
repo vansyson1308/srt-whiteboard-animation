@@ -486,3 +486,24 @@ def test_no_stop_inside_a_phrase():
     assert not beats("Chữ chánh ở đây cũng không chỉ là đúng hay sai.")                 # negated: not a reveal
     assert not beats("Cho tới khi thấy: khổ chỉ là phần ngọn.")                         # just paused at the colon
     assert beats("Người trẻ nhất ấy tên là Kiều Trần Như.") == {"là"}                  # a real reveal stays
+
+
+def test_foreign_words_weigh_by_syllables():
+    """A borrowed word is several syllables (several stretches of voice); weighing it like one
+    Vietnamese syllable shifts the alignment and moves its pause into the next phrase."""
+    viet = tts._speech_weight("thuốc")
+    assert tts._speech_weight("amrita") >= 2.5 * viet            # a-mri-ta
+    assert tts._speech_weight("quốc") == tts._speech_weight("quốc")
+    assert tts._speech_weight("khuya") < 1.5 * viet               # one Vietnamese syllable
+    text = "tìm amrita: thuốc trường sinh bất tử."
+    syl = ["tìm", "a", "mri", "ta", "thuốc", "trường", "sinh", "bất", "tử"]
+    segs, t = [], 100.0
+    for k, _ in enumerate(syl):
+        segs.append((t, t + 170))
+        t += 170 + (330 if k == 3 else 35)          # the voice rests after "amrita:", runs on elsewhere
+    pcm = speech(segs, t + 200)
+    out = tts.shape_pauses(text, pcm, 1.0, {1: 420})
+    iv = tts._voiced_intervals(out, 100)
+    gaps = [(b[0] - a[1], k) for k, (a, b) in enumerate(zip(iv, iv[1:]))]
+    assert len(gaps) == 1                            # one pause only: after "amrita:", not inside "thuốc trường"
+    assert abs(gaps[0][0] - 420) <= 40

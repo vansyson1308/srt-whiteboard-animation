@@ -117,6 +117,10 @@ def norm(t: str) -> str:
     return "".join(ch for ch in t if ch.isalnum())
 
 
+_VOWEL_RUN = re.compile(r"[aăâeêioôơuưyàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]+")
+SYLLABLE_WEIGHT = 6.5      # a typical Vietnamese syllable: ~4.5 letters + 2
+
+
 def _speech_weight(tok: str) -> float:
     """Relative speaking time of a token.  Digits are read out ("1969" -> "một nghìn chín
     trăm sáu mươi chín", ~2 syllables per digit), so they weigh far more than 4 letters."""
@@ -126,7 +130,10 @@ def _speech_weight(tok: str) -> float:
     digits = sum(ch.isdigit() for ch in n)
     if digits:
         return (2 * digits - 1) * 5.5 + (len(n) - digits) + 2.0
-    return len(n) + 2.0
+    # a Vietnamese syllable has exactly one run of vowels; a borrowed word ("amrita",
+    # "Purana") has one per syllable and is spoken as that many syllables
+    runs = len(_VOWEL_RUN.findall(n))
+    return max(len(n) + 2.0, runs * SYLLABLE_WEIGHT)
 
 
 def _weight(tok: str) -> float:
@@ -1032,7 +1039,7 @@ PROSODY_DSP_ENGINES = {"vieneu", "tiktok", "makevoice", "fish"}
 # formants too, so the narrator's timbre would change from sentence to sentence.  For these
 # engines a mood is carried by tempo, loudness, crescendo and the pauses around the sentence.
 DSP_TEMPO_SCALE = 0.6
-PROSODY_VERSION = 5          # bump when mood planning / DSP changes (invalidates voice caches)
+PROSODY_VERSION = 6          # bump when mood planning / DSP changes (invalidates voice caches)
 # engines whose own pauses are left to a generative model: their silences are reshaped
 PAUSE_SHAPE_ENGINES = {"vieneu", "tiktok", "makevoice", "fish"}
 BLOCK_CHARS = {"gemini": 1500, "openai": 1500, "makevoice": 1500, "fish": 1500, "vieneu": 600}
