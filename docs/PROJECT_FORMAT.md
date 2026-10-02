@@ -91,6 +91,27 @@ Giọng VieNeu (và tiktok, makevoice, fish) tự quyết độ dài từng kho�
 | `…` giữa câu | 380 ms |
 | khoảng lặng không có dấu câu (ngập ngừng) | rút còn tối đa 140 ms |
 
+### Đạo diễn nhịp: ngắt theo ý, không chỉ theo dấu câu
+
+Dấu câu cho biết câu *có thể* ngắt ở đâu; người dẫn còn chọn chỗ *nên* dừng. `voice_studio.py` đọc cấu trúc của từng câu và từng cặp câu, đặt thêm những nhịp ấy. Ở chỗ không có dấu câu, nó thêm dấu phẩy vào lời đọc (không vào phụ đề), để giọng tự khép cụm từ; độ dài nhịp vẫn đặt lại sau khi đọc như trên:
+
+| Cấu trúc | Ví dụ | Cách đọc |
+|---|---|---|
+| Điểm nhấn sau câu dẫn | "Tên nhóm chỉ có bốn chữ: **con ghét bố mẹ**." · "…đó là **…**" | dừng 420 ms rồi đọc cụm chốt chậm hơn ~7 % |
+| Mở đầu một danh sách / luận điểm | "…ba cái bẫy: …", "…như sau: …" | dừng 450 ms |
+| Đầu mục ngắn | "Thứ nhất: …", "Kết quả: …" | dừng 380 ms; câu mở bằng "Thứ hai", "Dấu hiệu thứ ba"… nghỉ thêm 250 ms trước nó |
+| Hai vế đối xứng | "Người lớn đọc… **/** Người trẻ đọc…" · "Có người…, có người…" | nghỉ thêm 220 ms giữa hai câu, 260 ms giữa hai vế trong một câu |
+| Tương phản | "…, còn …", "…, nhưng …", "không phải A **/** mà là B" | 280 / 220 ms |
+| Liệt kê | "khóc, gào, đòi hỏi" (≥ 3 mục ngắn) | mỗi dấu phẩy 240 ms |
+| Câu chốt | câu ≤ 7 từ ngay sau một câu dài | nghỉ thêm 150 ms trước nó |
+
+Chỗ máy không tự thấy, người viết kịch bản đánh dấu thẳng trong `narration` (không hiện trong phụ đề):
+
+- `|`: một nhịp ngừng (~320 ms); `||`: nhịp ngừng dài (~600 ms).
+- `*cụm từ*`: nhấn: ngừng trước cụm đó và đọc nó chậm hơn một chút.
+
+Ví dụ: `Họ không tìm thấy một kẻ thù. | Họ tìm thấy *chính mình*.` Xem trước kế hoạch: `python scripts/voice_studio.py "…"` (trường `breaks`, `emph` của từng câu). `"phrasing": false` tắt phần tự nhận diện; dấu `|`, `*…*` vẫn có hiệu lực.
+
 Giữa các câu là khoảng nghỉ theo phong cách; khoảng nghỉ dài của cảm xúc (hồi hộp, xúc động…) chỉ đến khi cảm xúc đổi, không lặp lại sau mỗi câu, và tối đa 1 giây. Giữa hai cảnh là một nhịp ngắt đoạn: cảnh kết thúc tối đa `tailMs + maxHoldMs` sau từ cuối cùng; nét vẽ cuối nếu chậm hơn sẽ được vẽ nhanh lên một chút thay vì để giọng chờ. Muốn ngắt theo ý thì viết dấu câu theo ý: phẩy cho hơi thở, hai chấm cho nhịp chờ, chấm cho hết ý; `[ngắt 800ms]` khi cần một khoảng lặng chính xác.
 
 ## Ba chế độ âm thanh

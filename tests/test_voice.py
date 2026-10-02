@@ -420,3 +420,45 @@ def test_same_mood_does_not_repeat_the_dramatic_pause():
 def test_scene_gap_is_bounded():
     v = make_video.SceneVoice(None, [tts.Word("a", 0, 4800)], 5000)
     assert make_video.longest_scene_ms(v, {"tailMs": 700, "maxHoldMs": 500}) == 6200
+
+
+def test_delivery_beats_follow_the_structure():
+    def plan(text, **kw):
+        return vs.plan_script(text, "natural", auto_mood=False, **kw).segments
+
+    reveal = plan("Tên nhóm chỉ có bốn chữ: con ghét bố mẹ.")[0]
+    assert reveal.breaks == {5: vs.REVEAL_MS} and reveal.emph == [[6, 9]]      # a beat, then the point
+    lead = plan("Tên nhóm chỉ có bốn chữ con ghét bố mẹ.")[0]                     # same without the colon
+    assert 5 in lead.breaks and "bốn chữ, con" in lead.spoken and lead.display.count(",") == 0
+    mirrored = plan("Người lớn đọc bốn chữ ấy và thấy sự bất hiếu. Người trẻ đọc bốn chữ ấy, và thấy một chỗ để nói.")
+    plain = plan("Người lớn đọc bốn chữ ấy và thấy sự bất hiếu. Chương trình hôm nay sẽ không đứng về phe nào.")
+    assert mirrored[1].pause_before_ms >= plain[1].pause_before_ms + vs.PARALLEL_MS - 5   # the contrast is heard
+    points = plan("Nhưng có ba cái bẫy. Thứ nhất: xả giận chưa chắc đã nguội. Thứ hai: đồng nghiền ngẫm.")
+    assert points[2].pause_before_ms > vs.STYLE_PRESETS["natural"]["pauses"]["sentence"] + vs.ORDINAL_MS - 5
+    lst = plan("Ban đầu, chúng phản kháng: khóc, gào, đòi hỏi.")[0]
+    assert lst.breaks[5] == lst.breaks[6] == vs.LIST_COMMA_MS and 1 not in lst.breaks   # items, not the opener
+    turn = plan("Hiếu không phải phục tùng mà là cùng nhau trở thành người tốt hơn.")[0]
+    assert "phục tùng, mà là" in turn.spoken and turn.display.startswith("Hiếu không phải phục tùng mà là")
+    inner = plan("Tôi có một luận điểm như sau: điều thứ nhất là học, điều thứ hai là hành.")[0]
+    assert inner.breaks[6] == vs.LIST_INTRO_MS and inner.breaks[11] == vs.PARALLEL_INNER_MS
+
+
+def test_author_marks_beats_and_stress():
+    s = vs.plan_script("Đó là | một câu hỏi *rất khó*. Hết.", "natural", phrasing=False).segments[0]
+    assert s.display == "Đó là một câu hỏi rất khó."
+    assert s.breaks == {1: vs.BEAT_MS["|"], 4: vs.BEAT_MS["|"]} and s.emph == [[5, 6]]
+    assert vs.strip_pause_tags("Đó là || một câu hỏi *rất khó*. [ngắt 1s] Hết.") == "Đó là một câu hỏi rất khó. Hết."
+    assert not vs.plan_script("Tên nhóm chỉ có bốn chữ: con ghét bố mẹ.", phrasing=False).segments[0].breaks
+
+
+def test_shape_pauses_opens_a_planned_beat():
+    text = "Tên nhóm chỉ có bốn chữ con ghét bố mẹ."
+    toks = tts.tokens(text)
+    w = [tts._speech_weight(t) for t in toks]
+    unit = 300 / max(w)
+    cut = 6                                                  # "Tên nhóm chỉ có bốn chữ" | "con ghét bố mẹ."
+    a = sum(w[:cut]) * unit
+    pcm = speech([(100, 100 + a), (140 + a, 140 + a + sum(w[cut:]) * unit)], 300 + a + sum(w[cut:]) * unit)
+    out = tts.shape_pauses(text, pcm, 1.0, {cut - 1: 400})
+    iv = tts._voiced_intervals(out, 30)
+    assert len(iv) == 2 and abs((iv[1][0] - iv[0][1]) - 400) <= 30
