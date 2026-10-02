@@ -641,35 +641,28 @@ def _voiced_intervals(pcm, min_gap_ms: int = MIN_GAP_MS) -> list[tuple[int, int]
     return out
 
 
-def anchor_words(text: str, pcm) -> list[Word]:
-    """Word timings for audio without timestamps.
-
-    Silences in the audio are matched (monotonic DP) to the punctuation of the text in
-    *voiced time* - the timeline with the pauses cut out, where speaking rate is nearly
-    uniform - and tokens are spread by length over the voiced time between anchors, so
-    no word is ever placed inside a pause.
-    """
-    toks = tokens(text)
-    if not toks:
-        return []
-    iv = _voiced_intervals(pcm)
-    if not iv:
-        import wb_video
-        return estimate_words(text, 0, len(pcm) * 1000 / wb_video.SAMPLE_RATE)
+def _voiced_timeline(iv: list[tuple[int, int]]) -> tuple[list[int], float]:
     cum_v, t = [], 0
     for s, e in iv:
         cum_v.append(t)
         t += e - s
-    total_v = float(t)
+    return cum_v, float(t)
+
+
+def _match_breaks(toks: list[str], w: list[float], iv: list[tuple[int, int]], cum_v: list[int],
+                  total_v: float) -> list[tuple[int, int]]:
+    """Match the punctuation of the text to the silences of the audio.
+
+    Both are placed in *voiced time* (the timeline with the pauses cut out, where the
+    speaking rate is nearly uniform); a monotonic DP pairs them.  Returns
+    ``(token index, gap index)`` pairs - gap ``j`` is the silence before ``iv[j + 1]``."""
     gaps = [(float(cum_v[k]), float(iv[k][0] - iv[k - 1][1])) for k in range(1, len(iv))]
-    w = [_speech_weight(x) for x in toks]
-    W = sum(w)
+    W = sum(w) or 1.0
     cw = [0.0]
     for x in w:
         cw.append(cw[-1] + x)
     bounds = [(i, total_v * cw[i + 1] / W, 450.0 if toks[i].rstrip("\"'”’)]»")[-1:] in ".!?…" else 250.0)
               for i in range(len(toks) - 1) if toks[i].rstrip("\"'”’)]»")[-1:] in _BREAK_PUNCT]
-    # DP over (boundaries, gaps)
     nb, ng = len(bounds), len(gaps)
     tol = max(700.0, 0.3 * total_v)
     inf = float("inf")
@@ -692,18 +685,39 @@ def anchor_words(text: str, pcm) -> list[Word]:
                 if d <= tol and dp[i - 1][j - 1] + d < best:
                     best, how = dp[i - 1][j - 1] + d, "m"
             dp[i][j], bk[i][j] = best, how
-    anchors: list[tuple[int, float]] = []
+    pairs: list[tuple[int, int]] = []
     i, j = nb, ng
     while i or j:
         how = bk[i][j]
         if how == "m":
-            anchors.append((bounds[i - 1][0], gaps[j - 1][0]))
+            pairs.append((bounds[i - 1][0], j - 1))
             i, j = i - 1, j - 1
         elif how == "b":
             i -= 1
         else:
             j -= 1
-    anchors.reverse()
+    pairs.reverse()
+    return pairs
+
+
+def anchor_words(text: str, pcm) -> list[Word]:
+    """Word timings for audio without timestamps.
+
+    Silences in the audio are matched (monotonic DP) to the punctuation of the text in
+    *voiced time* - the timeline with the pauses cut out, where speaking rate is nearly
+    uniform - and tokens are spread by length over the voiced time between anchors, so
+    no word is ever placed inside a pause.
+    """
+    toks = tokens(text)
+    if not toks:
+        return []
+    iv = _voiced_intervals(pcm)
+    if not iv:
+        import wb_video
+        return estimate_words(text, 0, len(pcm) * 1000 / wb_video.SAMPLE_RATE)
+    cum_v, total_v = _voiced_timeline(iv)
+    w = [_speech_weight(x) for x in toks]
+    anchors = [(ti, float(cum_v[j + 1])) for ti, j in _match_breaks(toks, w, iv, cum_v, total_v)]
 
     def wall(v: float, is_end: bool) -> float:
         for k, (s, e) in enumerate(iv):
@@ -727,6 +741,127 @@ def anchor_words(text: str, pcm) -> list[Word]:
             out.append(Word(toks[k], int(round(s)), int(round(max(s, e)))))
             v = nv
     return out
+
+
+# ──────────────────────────────────────────────────────────────
+# Pause shaping: the narrator's breaks, not the model's
+# ──────────────────────────────────────────────────────────────
+# A generative voice decides on its own how long to rest at each comma: in one sentence it
+# runs through a comma, in the next it stops for longer than between two sentences, and now
+# and then it hesitates in the middle of a phrase.  A presenter's breaks follow the text:
+# light inside a phrase, a breath at a comma, an expectant beat at a colon.  So every
+# silence inside a clip is matched to the punctuation and set to the length that punctuation
+# calls for; silences the text does not explain are shortened.
+PAUSE_TARGET_MS = {",": 170, ";": 280, ":": 300, "—": 260, "–": 260, "…": 380, ".": 450, "!": 450, "?": 480}
+SHORT_PHRASE_WORDS = 2     # "thật ra," - a light touch
+LONG_PHRASE_WORDS = 8      # a long run of words before the comma - a real breath
+SHORT_COMMA_MS = 120
+LONG_COMMA_MS = 230
+HESITATION_MAX_MS = 140    # a silence the punctuation does not explain is kept at most this long
+INSERT_MIN_MS = 250        # a break this long that the voice ran through is opened at a word boundary
+EDGE_KEEP_MS = 25          # audio kept on each side of a resized silence (release / attack)
+
+
+def _break_char(tok: str) -> str:
+    c = tok.rstrip("\"'”’)]»")[-1:]
+    return c if c in _BREAK_PUNCT else ""
+
+
+def pause_target_ms(toks: list[str], i: int, scale: float = 1.0) -> int | None:
+    """How long a narrator rests after token ``i`` (None: no punctuation there)."""
+    p = _break_char(toks[i])
+    if p not in PAUSE_TARGET_MS:
+        return None
+    base = PAUSE_TARGET_MS[p]
+    if p == ",":
+        left = 1
+        while i - left >= 0 and not _break_char(toks[i - left]):
+            left += 1
+        right = 0
+        while i + 1 + right < len(toks):
+            right += 1
+            if _break_char(toks[i + right]):
+                break
+        if left <= SHORT_PHRASE_WORDS or right <= SHORT_PHRASE_WORDS:
+            base = SHORT_COMMA_MS
+        elif left >= LONG_PHRASE_WORDS:
+            base = LONG_COMMA_MS
+    return int(round(base * scale))
+
+
+def shape_pauses(text: str, pcm, scale: float = 1.0):
+    """Resize the silences inside one clip to the breaks its punctuation calls for.
+
+    Matched silences get :func:`pause_target_ms`; unexplained ones are shortened to
+    ``HESITATION_MAX_MS``; a colon / semicolon / long-phrase comma the voice ran through
+    is opened at the nearest word boundary.  Speech itself is never touched."""
+    import numpy as np
+    import wb_video
+    toks = tokens(text)
+    iv = _voiced_intervals(pcm)
+    if not toks or len(iv) == 0:
+        return pcm
+    sr = wb_video.SAMPLE_RATE
+    cum_v, total_v = _voiced_timeline(iv)
+    w = [_speech_weight(x) for x in toks]
+    pairs = _match_breaks(toks, w, iv, cum_v, total_v)
+    target = {j: pause_target_ms(toks, ti, scale) for ti, j in pairs}
+    edits: list[tuple[float, float, float]] = []          # (start ms, end ms, new length ms)
+    for j in range(len(iv) - 1):
+        a, b = iv[j][1], iv[j + 1][0]
+        t = target.get(j)
+        if t is not None:
+            edits.append((a, b, t))
+        elif b - a > HESITATION_MAX_MS * scale:
+            edits.append((a, b, HESITATION_MAX_MS * scale))
+    # breaks the voice ran through: open the word boundary nearest to where the text puts them
+    matched = {ti for ti, _ in pairs}
+    W = sum(w) or 1.0
+    cw = [0.0]
+    for x in w:
+        cw.append(cw[-1] + x)
+    fine = _voiced_intervals(pcm, 30)
+    micro = []
+    for k in range(1, len(fine)):
+        a, b = fine[k - 1][1], fine[k][0]
+        if any(ea <= a and b <= eb for ea, eb, _ in edits):
+            continue                                       # part of a silence handled above
+        seg = next((n for n, (s0, e0) in enumerate(iv) if s0 <= a and b <= e0), None)
+        if seg is not None:
+            micro.append((cum_v[seg] + (a - iv[seg][0]), a, b))
+    tol = max(250.0, 0.06 * total_v)
+    for ti in range(len(toks) - 1):
+        t = pause_target_ms(toks, ti, scale)
+        if ti in matched or t is None or t < INSERT_MIN_MS * scale or not micro:
+            continue
+        want = total_v * cw[ti + 1] / W
+        v, a, b = min(micro, key=lambda m: abs(m[0] - want))
+        if abs(v - want) <= tol:
+            edits.append((a, b, t))
+            micro = [m for m in micro if m[1] != a]
+    if not edits:
+        return pcm
+    edits.sort()
+    fade = max(1, int(0.004 * sr))
+    out, cur = [], 0
+    for a, b, new in edits:
+        sa, sb = int(a * sr / 1000), int(b * sr / 1000)
+        if sa < cur:
+            continue
+        old = sb - sa
+        keep = min(int(EDGE_KEEP_MS * sr / 1000), old // 3, int(new * sr / 1000) // 2)
+        left = np.array(pcm[cur:sa + keep], np.float32)
+        if len(left) > fade:
+            left[-fade:] *= np.linspace(1, 0, fade, dtype=np.float32)
+        out.append(left)
+        out.append(np.zeros(max(0, int(new * sr / 1000) - 2 * keep), np.float32))
+        right = np.array(pcm[sb - keep:sb], np.float32)
+        if len(right) > fade:
+            right[:fade] *= np.linspace(0, 1, fade, dtype=np.float32)
+        out.append(right)
+        cur = sb
+    out.append(np.asarray(pcm[cur:], np.float32))
+    return np.concatenate(out)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -823,7 +958,9 @@ PROSODY_DSP_ENGINES = {"vieneu", "tiktok", "makevoice", "fish"}
 # formants too, so the narrator's timbre would change from sentence to sentence.  For these
 # engines a mood is carried by tempo, loudness, crescendo and the pauses around the sentence.
 DSP_TEMPO_SCALE = 0.6
-PROSODY_VERSION = 2          # bump when mood planning / DSP changes (invalidates voice caches)
+PROSODY_VERSION = 3          # bump when mood planning / DSP changes (invalidates voice caches)
+# engines whose own pauses are left to a generative model: their silences are reshaped
+PAUSE_SHAPE_ENGINES = {"vieneu", "tiktok", "makevoice", "fish"}
 BLOCK_CHARS = {"gemini": 1500, "openai": 1500, "makevoice": 1500, "fish": 1500, "vieneu": 600}
 PARALLEL = {"edge": 4, "tiktok": 3, "gemini": 3, "openai": 3, "makevoice": 2, "fish": 2, "vieneu": 1}
 
@@ -834,7 +971,7 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
                style: str | None = None, pause_scale: float = 1.0, lexicon: dict | list | None = None,
                phrasing: bool = True, reference: str | None = None, reference_text: str | None = None,
                consent: bool = False, chunk: str | None = None, mood: str | None = None,
-               expressiveness: float = 1.0, auto_mood: bool = True) -> TTSResult:
+               expressiveness: float = 1.0, auto_mood: bool = True, pause_shaping: bool = True) -> TTSResult:
     """Speak ``text`` into ``out``.  ``style`` (natural/news/story/podcast/ads) turns on the
     Voice Studio: per-sentence prosody + planned pauses (edge/tiktok/vieneu) or a style
     direction (gemini/openai).  ``style=None`` or "plain" keeps a single request (edge/openai).
@@ -848,7 +985,11 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
     pitch shift, which would alter the timbre); gemini/openai get a spoken direction per sentence.
 
     Foreign names: write them in their own spelling.  VieNeu's G2P detects English words and
-    reads them in English; a Vietnamese respelling in ``lexicon`` forces a Vietnamese reading."""
+    reads them in English; a Vietnamese respelling in ``lexicon`` forces a Vietnamese reading.
+
+    ``pause_shaping``: for engines whose pauses come from a generative model (vieneu, tiktok,
+    makevoice, fish) the silences inside each sentence are set by its punctuation
+    (:func:`shape_pauses`) instead of whatever length the model chose."""
     import wb_video
     if engine not in ENGINES:
         raise ValueError(f"unknown TTS engine: {engine} (choose from {', '.join(ENGINES)})")
@@ -937,6 +1078,9 @@ def synthesize(text: str, out: str | Path, engine: str = "edge", voice: str | No
             f.unlink(missing_ok=True)
         if engine in PROSODY_DSP_ENGINES and same:
             pcm = wb_video.apply_prosody(pcm, s0.mood_rate * DSP_TEMPO_SCALE, 0.0, s0.gain_db, s0.ramp_db)
+        if pause_shaping and engine in PAUSE_SHAPE_ENGINES:
+            pace = 1.0 + (vs.MOODS[s0.mood]["pace"] - 1.0) * s0.intensity * expressiveness if same else 1.0
+            pcm = shape_pauses(spoken, pcm, max(0.3, min(3.0, float(pause_scale))) * pace)
         return Clip(pcm, anchor_words(disp, pcm), s0.pause_before_ms)
 
     try:

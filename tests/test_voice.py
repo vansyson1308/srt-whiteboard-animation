@@ -377,3 +377,46 @@ def test_block_fft_filter_matches_one_shot_and_envelope_is_exact():
     env = np.sqrt(np.convolve(m.astype(np.float64) ** 2, np.ones(2400) / 2400, mode="same"))
     assert np.allclose(wb_video.rms_envelope(m), env, atol=1e-9)
     assert abs(wb_video.loudness_lufs(x) - wb_video.loudness_lufs(x * 2) + 6.02) < 0.05
+
+
+def test_shape_pauses_follows_punctuation():
+    text = ("Một hai ba bốn năm sáu bảy tám, chín mười mười một mười hai mười ba mười bốn: "
+            "mười lăm mười sáu mười bảy mười tám.")
+    toks = tts.tokens(text)
+    w = [tts._speech_weight(t) for t in toks]
+    unit = 300 / max(w)                                     # ms of speech per weight unit
+
+    def run(a, b):                                          # voiced length of toks[a:b]
+        return sum(w[a:b]) * unit
+
+    comma = toks.index("tám,") + 1
+    colon = toks.index("bốn:") + 1
+    mid = comma + 3                                         # a hesitation inside "chín mười mười | một..."
+    segs, t = [], 100.0
+    for a, b, gap in [(0, comma, 700), (comma, mid, 450), (mid, colon, 40), (colon, len(toks), 0)]:
+        segs.append((t, t + run(a, b)))
+        t += run(a, b) + gap
+    pcm = speech(segs, t + 300)
+    out = tts.shape_pauses(text, pcm)
+    iv = tts._voiced_intervals(out, 30)
+    gaps = [b[0] - a[1] for a, b in zip(iv, iv[1:])]
+    assert len(gaps) == 3
+    assert abs(gaps[0] - tts.LONG_COMMA_MS) <= 30          # 8 words before it: a real breath, not 700 ms
+    assert gaps[1] <= tts.HESITATION_MAX_MS + 30           # the unexplained stop is shortened
+    assert abs(gaps[2] - tts.PAUSE_TARGET_MS[":"]) <= 30   # the colon the voice ran through is opened
+    voiced = lambda iv_: sum(e - s for s, e in iv_)        # noqa: E731
+    assert abs(voiced(iv) - voiced(tts._voiced_intervals(pcm, 30))) <= 30   # speech itself untouched
+    assert tts.pause_target_ms(tts.tokens("Thật ra, đây là một câu khá dài"), 1) == tts.SHORT_COMMA_MS
+
+
+def test_same_mood_does_not_repeat_the_dramatic_pause():
+    run = vs.plan_script("[hồi hộp] Một câu. Câu thứ hai. [bình thường] Câu thứ ba.", "natural")
+    s = run.segments
+    assert [x.mood for x in s] == ["suspense", "suspense", "neutral"]
+    assert s[1].pause_before_ms < s[2].pause_before_ms     # the long beat comes when the mood ends
+    assert all(x.pause_before_ms <= vs.MAX_AUTO_PAUSE_MS for x in s)
+
+
+def test_scene_gap_is_bounded():
+    v = make_video.SceneVoice(None, [tts.Word("a", 0, 4800)], 5000)
+    assert make_video.longest_scene_ms(v, {"tailMs": 700, "maxHoldMs": 500}) == 6200

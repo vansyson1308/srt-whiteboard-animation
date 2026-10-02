@@ -15,6 +15,7 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
     "style": "natural",                      // natural | news | story | podcast | ads | plain (đọc một lượt)
     "rate": "+5%", "pitch": "+0Hz",          // cộng thêm vào phong cách (edge)
     "pauseScale": 1.0,                       // nhân độ dài khoảng lặng tự động (0.3–3)
+    "pauseShaping": true,                    // vieneu/tiktok/makevoice/fish: khoảng nghỉ trong câu theo dấu câu (xem dưới)
     "chunk": null,                           // "sentence" | "paragraph": mỗi request một câu hay cả đoạn (mặc định theo engine)
     "fx": "broadcast",                       // xử lý giọng kiểu phát thanh (lọc ù, rõ tiếng, nén nhẹ); "none" để tắt
     "mood": null,                            // cảm xúc mặc định: fast | slow | climax | emotional | suspense | happy | neutral
@@ -39,7 +40,8 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
               "idleHand": "exit",                   // exit: vẽ đúng tốc độ tự nhiên rồi rút tay ra khỏi khung khi chờ
                                                     //   (data-filler lấp khoảng nghỉ) | stretch: kéo dài nét cho kín thời gian
               "drawSpeed": 1100 },                  // tốc độ bút tự nhiên, px/giây ở 1080p
-  "sync":   { "leadMs": 250, "voiceDelayMs": 200, "minDrawMs": 900, "maxDrawMs": 4500, "tailMs": 800 },
+  "sync":   { "leadMs": 250, "voiceDelayMs": 200, "minDrawMs": 900, "maxDrawMs": 4500, "tailMs": 700,
+              "maxHoldMs": 500 },                   // cảnh kết thúc tối đa tailMs + maxHoldMs sau từ cuối cùng
   "transition": { "type": "fade", "ms": 350 },      // fade | slide | cut
   "audio_master": { "lufs": -14 },
 
@@ -75,6 +77,21 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
 | `cues` | `[đầu, cuối]` (đánh số từ 1) – các câu SRT thuộc cảnh này (chế độ `audio`). |
 | `keepTiming` | `true` = giữ nguyên thời gian trong annotation, không đồng bộ theo giọng. |
 | `minMs` | Độ dài tối thiểu của cảnh. |
+| `pauseBeforeMs` | Nghỉ thêm trước lời đọc của cảnh này, ví dụ `500` khi sang chương mới. |
+
+## Nhịp đọc như người dẫn
+
+Giọng VieNeu (và tiktok, makevoice, fish) tự quyết độ dài từng khoảng lặng, nên cùng một dấu phẩy có lúc lướt qua, có lúc dừng lâu hơn cả giữa hai câu. Với `"pauseShaping": true` (mặc định), mỗi câu sau khi đọc được đo lại: khoảng lặng được ghép với dấu câu (DP trên trục thời gian có tiếng), rồi đặt lại độ dài theo dấu câu, nhân `pauseScale` và nhịp của cảm xúc:
+
+| Chỗ ngắt | Độ dài |
+|---|---|
+| dấu phẩy | 170 ms; 120 ms khi một vế chỉ 1–2 từ ("thật ra,"); 230 ms sau một vế dài ≥ 8 từ |
+| `;` / `—` | 280 / 260 ms |
+| `:` | 300 ms – nhịp chờ trước điều sắp nói; mở ra cả khi giọng đọc lướt qua |
+| `…` giữa câu | 380 ms |
+| khoảng lặng không có dấu câu (ngập ngừng) | rút còn tối đa 140 ms |
+
+Giữa các câu là khoảng nghỉ theo phong cách; khoảng nghỉ dài của cảm xúc (hồi hộp, xúc động…) chỉ đến khi cảm xúc đổi, không lặp lại sau mỗi câu, và tối đa 1 giây. Giữa hai cảnh là một nhịp ngắt đoạn: cảnh kết thúc tối đa `tailMs + maxHoldMs` sau từ cuối cùng; nét vẽ cuối nếu chậm hơn sẽ được vẽ nhanh lên một chút thay vì để giọng chờ. Muốn ngắt theo ý thì viết dấu câu theo ý: phẩy cho hơi thở, hai chấm cho nhịp chờ, chấm cho hết ý; `[ngắt 800ms]` khi cần một khoảng lặng chính xác.
 
 ## Ba chế độ âm thanh
 

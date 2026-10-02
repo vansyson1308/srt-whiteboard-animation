@@ -674,6 +674,8 @@ def prepare_spoken(display: str, lang: str, lexicon: list[tuple[str, str]], phra
 
 
 HZ_PER_SEMITONE = 8.0      # Edge prosody pitch is in Hz; ~8 Hz = one semitone for a narrator
+SAME_MOOD_PAUSE = 0.3      # share of a mood's extra pause kept between two sentences of the same mood
+MAX_AUTO_PAUSE_MS = 1000   # longest automatic pause between two sentences of one narration
 
 
 def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch: str | float = 0,
@@ -731,7 +733,12 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
         if auto > 0:
             auto *= 1.0 + (mp["pace"] - 1.0) * k
         if plan.segments:
-            auto += max(mp["before"] * k, prev_after) * pause_scale   # one breath, not two
+            extra = max(mp["before"] * k, prev_after)               # one breath, not two
+            if md == prev_mood[0] and md != "neutral":
+                extra *= SAME_MOOD_PAUSE       # inside a run of one mood the dramatic beat is not repeated
+            auto += extra * pause_scale
+            if u.boundary in ("sentence", "clause"):              # paragraphs keep their longer rest
+                auto = min(auto, MAX_AUTO_PAUSE_MS * pause_scale)
         r, p = preset["rate"] + user_rate, preset["pitch"] + user_pitch
         tweaks = []
         if u.type in ("heading", "question", "exclamation"):
