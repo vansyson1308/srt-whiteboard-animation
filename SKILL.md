@@ -1,162 +1,272 @@
 ---
 name: srt-whiteboard-animation
-description: Làm video whiteboard minh hoạ (bàn tay cầm bút vẽ từng nét, tô màu, giọng đọc tiếng Việt, phụ đề karaoke) cho TikTok/YouTube từ một chủ đề, một kịch bản, hoặc file SRT + giọng thu sẵn. Agent tự viết kịch bản, tự vẽ cảnh bằng SVG, rồi chạy một lệnh make_video.py ra MP4 16:9 và 9:16. Dùng khi người dùng muốn "làm video giải thích/whiteboard/vẽ tay", "biến SRT thành video vẽ tay", "làm video TikTok/YouTube kiến thức".
+description: Làm video whiteboard minh hoạ (bàn tay cầm bút vẽ từng nét, tô màu, giọng đọc tiếng Việt có nhịp như người dẫn, phụ đề karaoke) cho YouTube/truyền hình/TikTok từ một chủ đề, một kịch bản (kể cả rất dài), hoặc file SRT + giọng thu sẵn. Agent chắt lọc + kiểm chứng kịch bản, viết cảnh bằng Python (motifs + storyboard), chạy make_video.py ra MP4, soát QA và giao file. Dùng khi người dùng muốn "làm video giải thích/whiteboard/vẽ tay", "biến kịch bản/SRT thành video", "làm video TikTok/YouTube kiến thức".
 ---
 
 # Video whiteboard từ một prompt
 
-Bạn (agent) là **biên kịch + hoạ sĩ + dựng phim**. Máy lo phần còn lại: TTS, đồng bộ, vẽ nét, camera, phụ đề, âm thanh, xuất file.
+Bạn (agent) là **biên kịch + biên tập viên + hoạ sĩ + đạo diễn giọng đọc + dựng phim**. Máy lo phần còn lại: TTS, nhịp đọc, đồng bộ, vẽ nét, camera, phụ đề, âm thanh, xuất file.
 Trả lời người dùng bằng ngôn ngữ của họ (mặc định tiếng Việt).
 
 ## Chế độ làm việc
 
-- **Autopilot (mặc định)**: đi hết quy trình dưới đây rồi giao video + QA. Chỉ hỏi lại khi thiếu thông tin thật sự quan trọng (ví dụ: chủ đề mơ hồ).
-- **Duyệt từng bước**: nếu người dùng yêu cầu "cho tôi duyệt", dừng sau bước 2 (kịch bản), bước 3 (bản nháp `--draft`) để chờ xác nhận.
+- **Autopilot (mặc định):** đi hết quy trình dưới đây rồi giao video. Chỉ hỏi lại khi thiếu thông tin thật sự quan trọng.
+- **Duyệt từng bước:** khi người dùng yêu cầu, dừng sau bước 1 (dàn ý), bước 4 (ảnh soát cảnh) và bước 6 (kiểm tra khớp) để chờ xác nhận.
+- **Một kịch bản mới:** dọn dẹp video trước (bước 9), rồi mới bắt đầu.
 
 ## Chuẩn bị môi trường (một lần)
 
 ```bash
-python scripts/prepare_env.py          # tạo .venv + cài opencv, numpy, av, Pillow, edge-tts, resvg-py, svgelements
+python scripts/prepare_env.py          # tạo .venv + cài thư viện; VieNeu (giọng offline) nếu cài được
 ```
-Dùng interpreter in ra ở dòng cuối `ENV_PY=...` cho mọi lệnh bên dưới (gọi là `$PY`).
-Sau proxy công ty/SSL tự ký: đặt `SSL_CERT_FILE=<ca-bundle>` (TTS sẽ dùng).
 
-## Quy trình autopilot
+Dùng interpreter in ở dòng cuối (`ENV_PY=...`) cho mọi lệnh bên dưới; tài liệu này gọi nó là `$PY`. Sau proxy hoặc SSL tự ký: đặt `SSL_CERT_FILE=<ca-bundle>`.
 
-### 1. Tạo dự án
+## Quy trình
+
+### 1. Chắt lọc và kiểm chứng nội dung
+
+Đọc hết nguồn: transcript, kịch bản, bài viết. Viết dàn ý trước khi vẽ.
+
+- **Dàn ý:**
+  - **Hook** ở câu đầu: một tình huống, một con số, một câu hỏi hiểu được trong 2 giây.
+  - **Vòng mở:** 3–4 điều khán giả sẽ biết, nhá trước, chưa trả lời.
+  - **Thẻ tiêu đề.**
+  - **Các phần "PHẦN n"**, mỗi phần một luận điểm, 4–8 cảnh.
+  - **Kết:** quay lại hook, rút ra một câu chốt, rồi lời kêu gọi hợp nền tảng. YouTube: chia sẻ, bình luận. Truyền hình: lời cảm ơn, không kêu gọi đăng ký.
+- **Độ dài:**
+  - TikTok/Shorts 30–60 s (khoảng 110–180 từ).
+  - YouTube dài 10–15 phút (khoảng 2.300–3.000 từ, 45–60 cảnh).
+  - Tốc độ đọc khoảng 230 từ/phút.
+- **Chắt lọc:**
+  - Giữ những ý tinh túy nhất. Bỏ lặp, lan man, quảng cáo.
+  - Viết lại thành văn nói, câu ngắn, ai nghe cũng hiểu.
+  - Có thể bổ sung kiến thức chuẩn để làm rõ: kinh điển, triết học, tâm lý học.
+- **Kiểm chứng:**
+  - Mọi số liệu, năm, tên người, trích dẫn và tin thời sự đều phải được tra lại (dùng web/agent nghiên cứu khi có).
+  - Sửa lỗi của nguồn. Ghi rõ "được kể lại rằng" với giai thoại, nói rõ truyền thuyết hay chú giải.
+  - Lưu nguồn vào một file ghi chú (`ghi-chu-nguon.md`) để giao kèm. Không đọc trích dẫn dày đặc trong video.
+- **Biên tập:**
+  - Cân bằng, tôn trọng.
+  - Không mô tả chi tiết bạo lực hay tình dục, không quy chụp nhóm người.
+  - Chủ đề trẻ em, sức khỏe tâm thần: nhắc kênh hỗ trợ (Tổng đài quốc gia bảo vệ trẻ em 111).
+- **Tên dự án:** `projects/<slug>/` là thư mục riêng của người dùng, **không commit**: thêm `projects/<slug>/` vào `.git/info/exclude`. Không commit giọng mẫu, audio, video, API key hay `.env*`.
+
+### 2. Viết kịch bản + cảnh trong `projects/<slug>/build.py`
+
+Mẫu: [`examples/storyboard-mau/build.py`](examples/storyboard-mau/build.py). Video dài: tách cảnh ra `scenes_a.py`, `scenes_b.py`… (mỗi file một danh sách `sb.scene(...)` hoặc một hàm nhận `sb`), giữ `build.py` ngắn.
+
+```python
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from motifs import *
+from storyboard import Storyboard
+
+sb = Storyboard(__file__, "Tên video", preset="youtube", lexicon={})   # youtube | broadcast | tiktok
+sb.scene("[hồi hộp] Lời thoại cảnh 1 …", "ghi chú",
+         g("id", "Nhãn", "cụm từ nguyên văn", person(300, 800, 1.1), speech(...)), ...)
+sys.exit(sb.build())
+```
+
+**Lời thoại** (từng cảnh 40–70 từ, mỗi cảnh một ý):
+
+- **Văn nói:** câu ngắn. Viết số thành chữ khi cần đọc tự nhiên ("một một một", "năm một chín bảy chín").
+- **Dấu câu theo ý:** phẩy là chỗ lấy hơi, hai chấm là nhịp chờ trước điều sắp nói, chấm là hết ý. Hệ thống tự đặt nhịp như người dẫn theo cấu trúc câu:
+  - điểm nhấn sau câu dẫn ("…bốn chữ: …");
+  - hai vế đối xứng;
+  - "Thứ nhất / Thứ hai";
+  - liệt kê, tương phản, câu chốt.
+- **Đọc lại như một MC:** chỗ cần dừng mà cấu trúc câu không tự lộ ra thì chèn `|` (nhịp ngừng) hoặc `||` (ngừng dài); cụm cần nhấn thì viết `*cụm từ*`. Tiết chế: 0–2 dấu mỗi cảnh. Ngắt chính xác giữa hai câu: `[pause 600ms]`. Các dấu này không hiện trong phụ đề.
+- **Cảm xúc:** đặt tag ở đầu câu then chốt, 1–3 tag mỗi cảnh:
+  - `[hồi hộp]` cho hook, câu dẫn tò mò;
+  - `[cao trào]` cho con số sốc, cú lật;
+  - `[xúc động]` cho đoạn sâu lắng;
+  - `[chậm]` cho ý cốt lõi, câu chốt;
+  - `[nhanh]` cho đoạn dẫn dắt;
+  - `[vui]` cho lời kêu gọi tích cực;
+  - `[bình thường]` để ghim lại câu máy đọc nhầm.
+- **Tên riêng nước ngoài:** viết chính tả gốc (Einstein, Carl Jung). Kiểm tra cách đọc:
+
+  ```bash
+  $PY -c "from vieneu_utils.phonemize_text import phonemize_text_with_emotions as p; print(p('Sartre'))"
+  ```
+
+  Chỉ thêm `lexicon` khi máy đọc sai, ví dụ `{"Sartre": "Xác tơ", "MBTI": "em bi ti ai"}`. Đừng phiên âm kiểu "Niu-tơn".
+
+**Cảnh** (đọc [`docs/SVG_GUIDE.md`](docs/SVG_GUIDE.md)):
+
+- **Số phần tử:** 3–5 phần tử nhẹ mỗi cảnh, mỗi phần tử là `g(id, nhãn, data-say, *hình)`.
+- **`data-say`:** 1–3 từ, **nguyên văn** trong lời thoại của cảnh. Phần tử được vẽ theo thứ tự cụm từ được nói.
+- **Phần tử đầu tiên:** gắn với những chữ đầu của lời thoại.
+- **Hình mẫu:** dùng hình trong `motifs.py` cho phong cách thống nhất, như `person`, `woman`, `kid`, `teen`, `parent`, `monk`, `buddha`, `sage`, `book`, `scroll`, `phone`, `laptop`, `scale`, `ledger`, `heart`, `lens`, `mirror`, `hourglass`, `calendar`…
+  - Chữ và bố cục: `chapter(n, "Tên phần")` cho cảnh mở chương; `tag`, `speech`, `thought`, `arrow`, `check`, `cross`, `number_card`, `big_number`.
+  - Thiếu hình thì viết hàm mới trong `build.py` theo cùng phong cách (nét `#2b2b2b`, dày 4–7). Hình dùng nhiều lần nên thêm vào `motifs.py`.
+- **Tránh:**
+  - hình nặng (đám đông lớn, nhiều chữ), vì bút sẽ vẽ chậm;
+  - ký tự không có trong Patrick Hand ("→"): dùng `arrow()`;
+  - dấu gạch đè lên chữ: đặt `cross()` cạnh nhãn;
+  - nội dung sát mép;
+  - hình quan trọng ở 10% dưới cùng (chỗ của phụ đề).
+
+### 3. Dựng dự án
+
 ```bash
-$PY scripts/make_video.py --init projects/<slug>
+$PY projects/<slug>/build.py
 ```
-Tạo `projects/<slug>/video.json` + `scenes/`. (Mẫu hoàn chỉnh: `examples/demo-bau-troi/`.)
 
-### 2. Viết kịch bản (phần quan trọng nhất)
-- Độ dài: TikTok/Shorts 30–60s (~110–180 từ); YouTube 2–6 phút.
-- **Câu đầu là hook** (câu hỏi gây tò mò / sự thật bất ngờ / lời hứa giá trị) – phải hiểu được ngay trong 2 giây.
-- Chia 3–6 cảnh, **mỗi cảnh một ý**, 25–60 từ/cảnh (10–20 giây). Kết bằng một câu chốt/kêu gọi.
-- Câu ngắn, văn nói tự nhiên, số viết dạng chữ số được (TTS đọc đúng). Tránh ký hiệu lạ, viết tắt.
-- Viết `narration` cho từng cảnh vào `video.json`.
-- **Chọn giọng + phong cách đọc** (mục "Giọng đọc" bên dưới): TikTok/kiến thức → `"style": "podcast"`; kể chuyện/cảm xúc → `"story"`; tin tức → `"news"`; kêu gọi hành động → `"ads"`. Có thể đặt riêng cho từng cảnh bằng `"voice": {"style": "story"}` trong cảnh. Nhịp đọc kiểu người dẫn được tự đặt theo cấu trúc câu (điểm nhấn sau "…bốn chữ:", hai vế đối xứng, "Thứ nhất/Thứ hai", liệt kê, tương phản – xem PROJECT_FORMAT "Đạo diễn nhịp"). Đọc lại lời thoại như một MC: chỗ nào cần dừng để khán giả kịp nghe điểm nhấn mà câu không tự lộ ra cấu trúc ấy → chèn `|` (nhịp ngừng) hoặc `||` (ngừng dài); cụm cần nhấn → `*cụm từ*`. Dùng tiết chế, 0–2 dấu mỗi cảnh. Ngắt chính xác giữa hai câu → `[pause 600ms]`. Các dấu này không hiện trong phụ đề.
-- **Đạo diễn cảm xúc từng câu** (quan trọng để giọng truyền cảm): đặt tag ở đầu các câu then chốt – `[hồi hộp]` cho hook/câu dẫn tò mò, `[cao trào]` cho con số sốc/cú lật, `[xúc động]` cho đoạn buồn/sâu lắng, `[chậm]` cho định nghĩa/ý cốt lõi/câu chốt, `[nhanh]` cho đoạn liệt kê/dẫn dắt, `[vui]` cho kêu gọi tích cực. Mỗi cảnh chỉ 1–3 tag, để phần còn lại tự nhiên (không tag thì hệ thống tự đọc cảm xúc từ từ ngữ). Cả cảnh một màu cảm xúc → `"voice": {"mood": "emotional"}`. Kiểm tra: `$PY scripts/voice_studio.py "narration…" --style podcast` in ra mood, tốc độ, khoảng nghỉ từng câu.
+Lệnh này in `N scenes, W words`. Nếu có dòng `!!` (`data-say` không khớp lời thoại, thiếu glyph) thì sửa đến khi sạch.
 
-### 3. Vẽ từng cảnh bằng SVG
-Đọc **docs/SVG_GUIDE.md** trước khi vẽ. Tóm tắt:
-- `viewBox="0 0 1600 900"` (dùng chung 16:9 và 9:16) hoặc `0 0 1080 1350` nếu chỉ làm TikTok.
-- Mỗi `<g id=… data-label=… data-say="cụm từ trong lời thoại">` cấp cao nhất là một phần tử; phần tử được vẽ **theo thứ tự cụm từ được nói** (phần tử không có `data-say` theo thứ tự trong file); 3–6 phần tử/cảnh.
-- `data-say` phải **xuất hiện nguyên văn** trong `narration` của cảnh đó.
-- Nét `#2b2b2b` dày 5–8, bo tròn; nhấn cam/đỏ/xanh; font `Patrick Hand`; nhiều khoảng trắng; chữ trong cảnh chỉ là nhãn ngắn.
-- Phần tử đầu tiên nên là thứ "hút mắt" nhất (câu hỏi, con số, hình lạ), gắn với những chữ đầu của lời thoại: nó được vẽ ngay, nhưng không sớm hơn cụm từ của nó quá 1,5 giây.
-- Bút giữ tốc độ tự nhiên. Hình nặng (đám đông, đường ray, nhiều chữ) cần thời gian: để cụm từ của phần tử kế tiếp cách đủ xa, hoặc giản lược hình.
-- Bàn tay vẽ với tốc độ tự nhiên rồi rút khỏi khung trong lúc chờ phần tử sau. Nếu một cảnh có quãng nói dài (> 3 giây) mà không có gì mới để vẽ, thêm phần tử có `data-say` cho quãng đó, hoặc 1–2 hình trang trí `data-filler="1"` (bóng đèn, ngôi sao, gạch chân phụ…) – renderer tự vẽ chúng vào khoảng nghỉ.
+### 4. Soát hình
 
-Kiểm tra từng cảnh (nhìn ảnh bằng công cụ đọc ảnh của bạn):
 ```bash
-$PY scripts/svg_scene.py projects/<slug>/scenes/scene-01.svg --out-dir /tmp/chk
-$PY scripts/render_annotation_preview.py /tmp/chk/scene-01.png /tmp/chk/scene-01.annotation.json /tmp/chk/scene-01-check.jpg
+$PY scripts/scene_sheet.py projects/<slug> [--safe]     # --safe: khung an toàn 90% (truyền hình)
 ```
-Sửa SVG nếu: phần tử đè lên nhau khó đọc, chữ tràn khung, bố cục lệch, thiếu khoảng trống cho phụ đề ở đáy (~10%).
 
-*Ảnh raster thay cho SVG* (khi cần tranh chi tiết): `scripts/generate_images.py` (cần API key) hoặc ảnh có sẵn → trong cảnh dùng `"image": ..., "auto": {"elements": K, "labels": [...]}, "say": [...]`.
+Xem từng trang ảnh, mỗi trang 12 cảnh, bằng công cụ đọc ảnh. Kiểm tra:
 
-### 4. Bản nháp nhanh
+- hình chồng nhau, chữ tràn khung;
+- hình bị hiểu sai (ví dụ bát mì bị nhìn thành bát cơm);
+- dấu gạch đè chữ, hình quá to bị cắt.
+
+Sửa rồi chạy lại hai bước 3–4. Màu trong ảnh soát có thể khác màu render thật; chỉ dùng ảnh này để soát bố cục.
+
+### 5. Soát giọng (không cần tạo audio)
+
 ```bash
-$PY scripts/make_video.py projects/<slug>/video.json --draft
+$PY scripts/voice_studio.py "<lời thoại của một cảnh>"
 ```
-Kiểm tra nhanh độ khớp hình–tiếng mà không cần render (chỉ tổng hợp giọng + lập lịch, ~1 phút sau khi có giọng):
+
+Mỗi câu được in kèm khoảng nghỉ trước nó, cảm xúc, nhịp ngừng `⟨ms⟩` và cụm được nhấn `*…*`. Duyệt nhanh cả kịch bản: in các câu có cảm xúc khác `neutral` qua `voice_studio.plan_script(...)`.
+
+- Câu giải thích bị đọc thành `climax` / `fast` / `suspense` thì ghim `[bình thường]` hoặc `[chậm]`.
+- Thiếu điểm nhấn thì thêm `|` hoặc `*…*`.
+
+### 6. Kiểm tra khớp hình–tiếng
+
 ```bash
 $PY scripts/make_video.py projects/<slug>/video.json --sync-check
 ```
-Log `sync:` cho biết bút đặt xuống sớm/trễ bao nhiêu so với lúc nói cụm từ (trung vị nên ≈ −0.2 s… −0.4 s) và liệt kê các phần tử trễ nhất; chi tiết ở `out/<name>-sync.json`. Báo cáo `*-report.json` của mỗi lần xuất cũng có mục `sync`. (Đừng chạy hai lệnh `make_video` cùng lúc trên một dự án.)
 
-Mở `out/*-draft-qa.jpg` và đọc log `-- sync` (mỗi phần tử bắt đầu lúc nào). Kiểm tra:
-- khung 0s–2s đã có nét đang vẽ (hook);
-- mỗi phần tử xuất hiện đúng lúc nói tới nó (log sync ≈ thời điểm của cụm từ);
-- phụ đề không đè lên hình quan trọng, chữ tiếng Việt đúng dấu;
-- không phần tử nào vẽ quá vội (< 0.9s) – nếu có: tách câu, đổi `data-say`, hoặc bớt phần tử.
+Lệnh này tạo giọng (được cache) và lập lịch vẽ, không render. Dòng `sync:` cho biết trung vị bút đặt xuống so với lúc nói cụm từ (nên khoảng −0,2 s) và các phần tử trễ nhất. Trễ hơn khoảng 1,2 s:
 
-### 5. Xuất bản chính thức
+- tách câu;
+- đưa cụm `data-say` lên sớm hơn;
+- giản lược hình nặng.
+
+Đừng chạy hai lệnh `make_video` cùng lúc trên một dự án.
+
+### 7. Xuất bản chính thức
+
 ```bash
-$PY scripts/make_video.py projects/<slug>/video.json
+$PY scripts/make_video.py projects/<slug>/video.json --cleanup
 ```
-Kết quả trong `projects/<slug>/out/`: `*-portrait.mp4` (TikTok/Shorts/Reels), `*-landscape.mp4` (YouTube), `*.srt`, `*-qa.jpg`, `*-report.json`.
-Xem `*-qa.jpg` một lần cuối, rồi báo cho người dùng: đường dẫn file, thời lượng, loudness, và gợi ý tiêu đề + mô tả + 5 hashtag.
 
-### 6. Giao file cho người dùng (video lớn)
-Chat chỉ nhận file ≤ 30 MB, nên video dài (vài phút 1080p thường 50–150 MB) phải giao qua một trang Artifact:
+Video dài 12 phút mất khoảng 20–25 phút trên CPU; chạy nền và chờ thông báo. Sau đó:
+
+- Đọc `out/<name>-report.json`: thời lượng, `frames == round(durationSec × fps)`, loudness đúng preset.
+- Xem `out/*-qa.jpg`.
+
+### 8. Giao
+
 ```bash
-$PY scripts/share_video.py projects/<slug>/out/<slug>-landscape.mp4 --title "Tên video"
+$PY scripts/share_video.py projects/<slug>/out/<name>-landscape.mp4 --title "Tên video"
+$PY scripts/export_script.py projects/<slug>/video.json --notes projects/<slug>/ghi-chu-nguon.md
 ```
-Script cắt file thành các phần ≤ 14 MB (`share-<tên>/parts/`), tạo `index.html` và in các lượt publish. Publish `index.html` bằng Artifact tool, kèm `files` của lượt 1, `capabilities: {"downloads": true}` và `icon: "video"`. Các lượt sau publish lại **cùng file_path** chỉ với `files` còn lại (file được cộng dồn). Trang tự ghép các phần, kiểm tra SHA-256, phát video và có nút **Lưu video (.mp4)** để tải bản gốc, không nén lại. Trang là riêng tư; không đưa video lên repo.
 
-### 7. Dọn dẹp sau khi giao (video dài)
-Sau khi người dùng đã nhận video, giải phóng dung lượng: `$PY scripts/make_video.py <dự án>/video.json --cleanup` (hoặc thêm `--cleanup` ngay lần xuất cuối). Lệnh này xoá các bản render từng cảnh và PNG trung gian, giữ cache giọng đọc và nhạc (tốn thời gian tạo lại). Xoá luôn thư mục `out/share-*/parts` sau khi đã publish. Video 15 phút cần ~4 GB RAM ở bước trộn âm thanh; model VieNeu được giải phóng ngay sau bước giọng đọc.
+- **Publish video:**
+  - Publish `out/share-*/index.html` bằng Artifact tool với `files` của lượt 1, `capabilities: {"downloads": true}`, `icon: "video"` và một câu `description`.
+  - Các lượt sau publish lại **cùng file_path**, chỉ kèm `files` còn lại.
+  - Kiểm tra bằng `list` với scope `files`: đủ mọi phần.
+  - Sửa video sau đó thì publish lại cùng file_path để giữ nguyên link.
+- **Gửi file:** gửi `kich-ban-<name>.md` (mốc chương dán vào mô tả YouTube, lời thoại kèm thời điểm) và `out/<name>.srt`.
+- **Báo người dùng:**
+  - link, thời lượng, mốc chương;
+  - những chỗ đã sửa hoặc kiểm chứng so với nguồn;
+  - gợi ý tiêu đề và mô tả nếu là YouTube.
 
-## Tuỳ chọn hay dùng trong `video.json`
+### 9. Dọn dẹp
 
-| Muốn | Đặt |
+- **Xoá:** `out/share-*/parts`, ảnh soát trong thư mục nháp, `__pycache__`.
+- **Cache giọng (`build/voice`):** chỉ giữ khi có thể phải sửa video. Khi đổi `PROSODY_VERSION`, cache cũ trở thành rác.
+- **Không xoá video đã giao** nếu người dùng chưa đồng ý.
+
+## Video ngắn (TikTok) và JSON viết tay
+
+- **Video ngắn:** vẫn dùng `Storyboard` với `preset="tiktok"`, 3–6 cảnh.
+  - Hoặc `make_video.py --init projects/<slug>` rồi viết `video.json` và SVG bằng tay (mẫu: `examples/demo-bau-troi/`).
+  - Khung TikTok toàn màn hình: SVG `viewBox="0 0 1080 1920"`, nội dung ở y 150–1120, chừa y 1150–1400 cho phụ đề (`examples/showcase-gap-giay/`).
+- **Ảnh raster thay cho SVG:** `"image": ..., "auto": {"elements": K, "labels": [...]}, "say": [...]`. Ảnh tạo bằng `generate_images.py` (cần API key) hoặc ảnh có sẵn.
+- **Giọng thu sẵn + SRT:** `"voice": null, "audio": {"file": "voice.mp3", "srt": "voice.srt"}`, mỗi cảnh có `"cues": [1, 5]`.
+
+## Tuỳ chọn hay dùng
+
+| Muốn | Đặt (trong `Storyboard(config={...})` hoặc `video.json`) |
 |---|---|
-| Giọng nam (mặc định) | VieNeu `Hải Đăng`; nam khác: `"voice": {"voice": "Thiện Minh"}` (kể chuyện), `"Minh Đức"` (tin tức), `"Thanh Bình"` |
-| Đọc nhanh hơn | `"voice": {"rate": "+10%"}` |
-| Đọc có hồn hơn | `"voice": {"style": "podcast"}` (hoặc `story` / `news` / `ads` / `natural`) |
-| Giọng Việt tự nhiên, miễn phí, chạy offline | `"voice": {"engine": "vieneu", "voice": "Hải Đăng", "style": "podcast"}` (cần `pip install vieneu`) |
-| Giọng LLM hay nhất (key miễn phí) | `"voice": {"engine": "gemini", "voice": "Sulafat", "style": "story"}` + `GEMINI_API_KEY` |
-| Giọng cao cấp (trả phí) | `"voice": {"engine": "elevenlabs"}` + `ELEVENLABS_API_KEY` (mặc định giọng Việt MinhTrung) |
-| Đọc đúng từ viết tắt | `"voice": {"lexicon": {"GPT": "gi pi ti", "NASA": "na xa"}}` |
-| Nhạc nền không lo bản quyền | `"music": {"generate": "calm", "volumeDb": -24}` (hoặc `"bright"`) |
-| Nhạc nền của bạn | `"music": {"file": "music/bg.mp3", "volumeDb": -20}` |
-| TikTok full màn hình | vẽ SVG `viewBox="0 0 1080 1920"`, `"formats": ["portrait"]`; giữ nội dung ở y 150–1120, chừa y 1150–1400 cho phụ đề – xem `examples/showcase-gap-giay/` |
+| Giọng nam khác | `"voice": {"voice": "Thiện Minh"}` (kể chuyện), `"Minh Đức"` (tin tức), `"Thanh Bình"` |
+| Nghỉ dài/ngắn hơn toàn bài | `"voice": {"pauseScale": 1.2}` (mặc định trong preset: 1.1) |
+| Đọc nhanh hơn | `"voice": {"rate": "+8%"}` |
+| Tắt nhịp tự động (giữ dấu `\|`, `*…*`) | `"voice": {"phrasing": false}` |
+| Một cảnh đọc khác | `sb.scene(..., voice={"mood": "emotional"})` hoặc `{"style": "ads"}` |
+| Nghỉ dài trước một cảnh | `sb.scene(..., pauseBeforeMs=800)` (cảnh mở chương tự có 500) |
+| Giọng LLM | `"voice": {"engine": "gemini", "voice": "Sulafat"}` + `GEMINI_API_KEY` |
+| Nhạc của bạn | `"music": {"file": "music/bg.mp3", "volumeDb": -20}` |
 | Tên kênh trên bút | `$PY scripts/brand_hand.py "Tên Kênh" assets/my-hand.png` → `"render": {"hand": "../../assets/my-hand.png"}` |
-| Không có tay | `"render": {"hand": false}` |
-| Không zoom camera | `"render": {"camera": "none"}` |
-| Chỉ bản dọc | `"formats": ["portrait"]` |
-| Giọng thu sẵn + SRT | `"voice": null, "audio": {"file": "voice.mp3", "srt": "voice.srt"}`, cảnh dùng `"cues": [1, 5]` |
+| Không có tay / không zoom | `"render": {"hand": false}` / `"render": {"camera": "none"}` |
 
-Schema đầy đủ: **docs/PROJECT_FORMAT.md**.
+Schema đầy đủ: [`docs/PROJECT_FORMAT.md`](docs/PROJECT_FORMAT.md).
 
-## Giọng đọc (Voice Studio – từ ttspromax)
+## Giọng đọc
 
-`"style"` bật "đạo diễn giọng đọc": mỗi câu được đọc riêng với tốc độ/cao độ theo loại câu (hỏi, cảm thán, đầu/cuối đoạn), thêm dấu phẩy lấy hơi trước từ nối trong câu dài, và ghép lại với khoảng lặng chính xác theo phong cách. Mặc định `"natural"`; `"plain"` = đọc một lượt như cũ.
-
-**Mặc định**: engine `vieneu`, giọng nam `Hải Đăng`, `"fx": "broadcast"` (lọc ù, tăng độ rõ, nén nhẹ như giọng phát thanh). Chưa cài `vieneu` thì tự chuyển sang edge `vi-VN-NamMinhNeural`. Mỗi câu VieNeu có độ dài bất thường (đọc lan man/nuốt chữ) được đọc lại, giữ bản tốt nhất (`VIENEU_TAKES`, mặc định 3).
-
-| Engine | Giọng (`voice`) | Cần | Ghi chú |
+| Engine | Giọng | Cần | Ghi chú |
 |---|---|---|---|
-| `edge` (mặc định) | `vi-VN-HoaiMyNeural`, `vi-VN-NamMinhNeural`, `en-US-AndrewMultilingualNeural`, … | không | miễn phí, timestamp thật; chỉ 2 giọng Việt |
-| `vieneu` | Bắc: `Hải Đăng`, `Thiện Minh` (kể chuyện), `Minh Đức` (tin tức), `Thanh Bình`, `Mai Anh` (nữ, tin tức), `Ngọc Linh` (nữ, kể chuyện); Nam: `Minh Triết`, `Thùy Dung`; Trung: `Quang Sơn` (`tts.py --list-voices vieneu`) | `pip install vieneu` (~1 GB model tải lần đầu) | VieNeu-TTS v3 Turbo, Apache-2.0, chạy CPU (~1× thời gian thực); clone từ `"reference"` cần `"confirmAuthorizedVoice": true` |
-| `gemini` | `Sulafat` (ấm), `Kore`, `Aoede`, `Charon` (nam, truyền đạt), `Algieba`, `Gacrux`, … | `GEMINI_API_KEY` (có gói miễn phí) | LLM hiểu ngữ cảnh, làm theo `style` bằng lời; đọc từng câu (`"chunk": "paragraph"` để đọc cả đoạn) |
-| `elevenlabs` | mặc định `FTYCiQT21H9XQvhRu0ch` (MinhTrung), hoặc giọng Việt khác trong Voice Library / giọng bạn tự clone | `ELEVENLABS_API_KEY` | timestamp ký tự thật; tự thử `eleven_v4` → `eleven_v3` → `eleven_flash_v2_5` (`ELEVENLABS_MODEL` để cố định) |
-| `openai` | `alloy`, `nova`, … | `OPENAI_API_KEY` | `style` thành `instructions`; `OPENAI_BASE_URL` trỏ tới server tương thích (vd. `vieneu serve`) |
-| `fish` | model id trên fish.audio, hoặc clone từ `"reference"` + `"referenceText"` | `FISH_API_KEY`, `pip install fish-audio-sdk` | **chỉ clone giọng khi chính chủ đồng ý**: `"confirmAuthorizedVoice": true`; không commit file giọng mẫu |
-| `tiktok` / `makevoice` | `BV074_streaming`, `BV075_streaming` / ID ElevenLabs | không | qua dịch vụ trung gian không chính thức, điều khoản thương mại không rõ → **chỉ dùng làm nháp**, không dùng cho kênh kiếm tiền |
+| `vieneu` (mặc định) | Bắc: `Hải Đăng` (mặc định), `Thiện Minh`, `Minh Đức`, `Thanh Bình`, `Mai Anh` (nữ), `Ngọc Linh` (nữ); Nam: `Minh Triết`, `Thùy Dung`; Trung: `Quang Sơn` | `pip install vieneu` (~1 GB model lần đầu) | offline, CPU ~1× thời gian thực. Clone từ `"reference"` cần `"confirmAuthorizedVoice": true` |
+| `edge` | `vi-VN-NamMinhNeural`, `vi-VN-HoaiMyNeural` | không | tự dùng khi chưa cài VieNeu |
+| `gemini` | `Sulafat`, `Kore`, `Charon`… | `GEMINI_API_KEY` | làm theo `style` bằng lời |
+| `elevenlabs` | MinhTrung hoặc Voice Library | `ELEVENLABS_API_KEY` | timestamp ký tự |
+| `openai` | `alloy`, `nova`… | `OPENAI_API_KEY` | `OPENAI_BASE_URL` trỏ server tương thích |
+| `fish` | model id / clone | `FISH_API_KEY` | **chỉ clone khi chính chủ đồng ý**; không commit giọng mẫu |
+| `tiktok` / `makevoice` | – | không | dịch vụ trung gian không chính thức: **chỉ làm nháp** |
 
-**Tên riêng / từ nước ngoài**: viết đúng chính tả gốc (Newton, Blavatsky, Carl Jung…). VieNeu tự nhận ra từ tiếng Anh và đọc theo phiên âm tiếng Anh. **Đừng** phiên âm kiểu "Niu-tơn" trong `lexicon`, vì như thế sẽ ép đọc thuần Việt. Chỉ dùng `lexicon` để viết lại từ mà G2P đọc sai (ví dụ `"Lascaux": "Lasko"`) hoặc cho từ viết tắt tiếng Việt. Kiểm tra cách đọc: `python -c "from vieneu_utils.phonemize_text import phonemize_text_with_emotions as p; print(p('Lascaux'))"`.
+Ba tầng điều khiển cách đọc:
 
-**Điều tiết theo nội dung (mood)**: mỗi câu có mood riêng (tag `[cao trào]`, `[xúc động]`, `[hồi hộp]`, `[chậm]`, `[nhanh]`, `[vui]`, hoặc tự đọc từ nội dung) quyết định tốc độ, cao độ, độ to, to/nhỏ dần và khoảng nghỉ quanh câu (với VieNeu: tốc độ nhẹ, độ to và khoảng nghỉ; không dịch cao độ để giữ nguyên chất giọng). `"expressiveness"` (0–2, mặc định 1) chỉnh độ đậm; `"autoMood": false` chỉ nghe theo tag. Bảng đầy đủ: docs/PROJECT_FORMAT.md.
+1. **Phong cách và cảm xúc:** nhịp nghỉ giữa câu và đoạn; tốc độ, độ to, khoảng nghỉ theo tag.
+2. **Khoảng nghỉ theo dấu câu** (`pauseShaping`): mỗi câu được căn từng âm tiết rồi đặt lại khoảng lặng.
+   - Dấu phẩy khoảng 170 ms, dấu hai chấm 300 ms.
+   - Chỗ ngập ngừng không có dấu câu rút còn tối đa 140 ms.
+3. **Đạo diễn nhịp** (`phrasing`): nhịp theo cấu trúc câu và dấu `|`, `*…*` của người viết.
 
-Xem cách một đoạn sẽ được đọc (không cần mạng): `$PY scripts/voice_studio.py "Lời thoại…" --style story`. Danh sách giọng: `$PY scripts/voice_studio.py x --catalogue`.
-Engine không có timestamp (vieneu/gemini/tiktok/makevoice/openai/fish) được căn thời gian bằng khoảng lặng trong audio khớp với dấu câu, nên `data-say` vẫn đồng bộ tốt (sai số ~0.1s); câu ngắn, dấu câu rõ ràng giúp đồng bộ chính xác hơn.
+Bảng chi tiết: PROJECT_FORMAT, mục "Nhịp đọc như người dẫn".
 
 ## Xử lý sự cố
 
-- `edge-tts failed … certificate` → đặt `SSL_CERT_FILE`; không có mạng → `--engine silent` để làm nháp đúng nhịp.
-- Engine trả thiếu giọng / lỗi mạng (gemini, tiktok, makevoice) → chạy lại (có retry + cache theo cảnh), hoặc tạm `--engine edge`.
-- Phần tử không được vẽ đúng lúc → `data-say` không khớp lời thoại (xem log `-- sync`), sửa cho khớp nguyên văn.
-- Nét bị cắt / vùng sai (ảnh raster) → mở `assets/preview.html`, chỉnh vùng, lưu, chạy lại.
-- Mọi thứ được cache trong `build/`; `--no-cache` để làm lại từ đầu.
+| Triệu chứng | Cách xử lý |
+|---|---|
+| `!! data-say … is not in the narration` | sửa cho khớp nguyên văn lời thoại (sau khi bỏ tag, dấu nhịp) |
+| `!! Patrick Hand has no '→'` | vẽ bằng `arrow()` hoặc viết chữ |
+| phần tử vẽ trễ | `--sync-check`; tách câu, đổi `data-say`, giản lược hình |
+| máy đọc sai cảm xúc hoặc thiếu điểm nhấn | `voice_studio.py "…"`; ghim tag, thêm `\|` / `*…*` |
+| đọc sai tên riêng | phonemize để kiểm tra, thêm `lexicon` |
+| `edge-tts failed … certificate` | `SSL_CERT_FILE` |
+| không có mạng | `--engine silent` để dựng nháp đúng nhịp |
+| `Killed` khi xuất video dài | thiếu RAM: chạy lại (đã cache); video 15 phút cần ~4 GB |
+| `Wave_write` lỗi | hai lệnh `make_video` chạy cùng lúc trên một dự án |
+| muốn làm lại từ đầu | `--no-cache` hoặc xoá `build/` |
 
 ## Các script
 
 | Script | Việc |
 |---|---|
-| `make_video.py` | Pipeline một lệnh (dùng cái này) |
-| `svg_scene.py` | SVG → PNG + annotation có nét vector + label map |
-| `auto_annotate.py` | Ảnh raster → annotation tự động |
-| `tts.py` | TTS + timestamp từng từ, 8 engine (+ `--list-voices vi`) |
-| `voice_studio.py` | Đạo diễn giọng đọc: phong cách, ngắt nghỉ, từ điển phát âm |
-| `render_stream_whiteboard.py` | Render một cảnh (tương thích CLI cũ) |
-| `render_annotation_preview.py` | Ảnh kiểm tra vùng/thời gian |
-| `qa_frames.py` | Contact sheet + thông số video/âm thanh |
-| `share_video.py` | Giao video lớn: cắt phần + trang Artifact xem/tải bản gốc |
-| `generate_images.py` | Tạo ảnh line-art bằng OpenAI/Gemini (tuỳ chọn) |
-| `brand_hand.py` | In tên kênh lên bút |
-| `gen_music.py` | Nhạc nền procedural, không bản quyền |
-| `parse_srt.py`, `merge_scenes.py` | Công cụ SRT/ghép cảnh của quy trình cũ |
+| `make_video.py` | pipeline một lệnh (`--draft`, `--sync-check`, `--cleanup`, `--init`) |
+| `storyboard.py` | dựng dự án từ cảnh viết bằng Python + kiểm tra `data-say` / glyph + preset |
+| `motifs.py` | khoảng 200 hình mẫu cùng phong cách + `g()`, `chapter()`, `tag()` |
+| `scene_sheet.py` | ảnh tổng hợp các cảnh để soát bố cục |
+| `voice_studio.py` | xem trước cách đọc: cảm xúc, khoảng nghỉ, nhịp, nhấn |
+| `tts.py` | TTS + timestamp từng từ, 9 engine (`--list-voices vieneu`) |
+| `export_script.py` | kịch bản có mốc thời gian + chương |
+| `share_video.py` | giao video lớn: cắt phần + trang Artifact xem/tải bản gốc |
+| `svg_scene.py` | SVG → PNG + annotation nét vector |
+| `qa_frames.py` | contact sheet + thông số một video |
+| `auto_annotate.py`, `render_annotation_preview.py` | ảnh raster → annotation; ảnh kiểm tra vùng |
+| `gen_music.py`, `brand_hand.py`, `generate_images.py` | nhạc nền; tên kênh trên bút; tạo ảnh line-art (tuỳ chọn) |
+| `render_stream_whiteboard.py`, `parse_srt.py`, `merge_scenes.py` | quy trình cũ (SRT + ảnh + chỉnh tay) |

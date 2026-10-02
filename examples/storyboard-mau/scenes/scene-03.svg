@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <!-- Kết -->
+  <g id="sleep" data-label="Giấc ngủ" data-say="ngủ đủ">
+    <circle cx="450" cy="330" r="90" fill="#e6e6e6" stroke="#2b2b2b" stroke-width="6"/>
+    <circle cx="423" cy="312" r="16" fill="#ffffff" stroke="#9a9a9a" stroke-width="4"/>
+    <circle cx="482" cy="352" r="12" fill="#ffffff" stroke="#9a9a9a" stroke-width="4"/>
+    <circle cx="459" cy="290" r="8" fill="#ffffff" stroke="#9a9a9a" stroke-width="3"/>
+    <text x="620" y="330" text-anchor="middle" font-family="Patrick Hand" font-size="70" fill="#3b7dd8">Z z z</text>
+    <circle cx="450" cy="590" r="28" fill="#ffffff" stroke="#2b2b2b" stroke-width="5"/>
+    <path d="M440 584 l 0 3 M460 584 l 0 3 M440 598 q 10 9 20 0" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M450 618 L 450 710 M420 780 L 450 710 L 480 780" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M412 690 L 450 638 L 488 690" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="not" data-label="Không phải lười" data-say="không phải là lười">
+    <rect x="990" y="290" width="220" height="80" rx="18" fill="#f4f4f4" stroke="#2b2b2b" stroke-width="6"/>
+    <text x="1100" y="347" text-anchor="middle" font-family="Patrick Hand" font-size="50" fill="#2b2b2b">lười?</text>
+    <path d="M1232 302 L 1288 358 M1288 302 L 1232 358" fill="none" stroke="#e04b3a" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="heal" data-label="Tự chữa lành" data-say="tự chữa lành">
+    <path d="M1150 648 C 1066 588, 1090 516, 1150 558 C 1210 516, 1234 588, 1150 648 Z" fill="#e04b3a" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -986,8 +986,13 @@ def main(argv=None) -> int:
                        expressiveness=a.expressiveness)
     for s in plan.segments:
         feel = f"{s.mood}" + (f"·{s.intensity:.1f}" if s.mood != "neutral" else "")
+        toks = s.display.split()
+        stressed = {k for a_, b_ in s.emph for k in range(a_, b_ + 1)}
+        shown = " ".join((f"*{t}*" if k in stressed else t) + (f" ⟨{s.breaks[k]}⟩" if k in s.breaks else "")
+                         for k, t in enumerate(toks))
         print(f"[{s.pause_before_ms:>5} ms] {format_rate(s.rate):>5} {format_pitch(s.pitch):>6} "
-              f"{s.type:<11} {feel:<14} {s.spoken}")
+              f"{s.type:<11} {feel:<14} {shown}")
+    print("⟨ms⟩ = nhịp ngừng sau từ đó (trước khi nhân pauseScale), *từ* = được nhấn")
     return 0
 
 

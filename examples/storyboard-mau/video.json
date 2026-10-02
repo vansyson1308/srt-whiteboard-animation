@@ -1,0 +1,62 @@
+{
+  "title": "Vì sao cần ngủ đủ giấc?",
+  "name": "ngu-du-giac",
+  "voice": {
+    "engine": "vieneu",
+    "voice": "Hải Đăng",
+    "style": "natural",
+    "pauseScale": 1.1
+  },
+  "captions": {
+    "enabled": true,
+    "karaoke": true,
+    "maxWords": 7
+  },
+  "music": {
+    "generate": "calm",
+    "volumeDb": -27,
+    "duck": true,
+    "duckDb": -8
+  },
+  "sfx": {
+    "pen": true,
+    "volumeDb": -19
+  },
+  "render": {
+    "camera": "follow",
+    "cameraMaxZoom": 1.2
+  },
+  "transition": {
+    "type": "fade",
+    "ms": 400
+  },
+  "formats": [
+    "landscape"
+  ],
+  "fps": 30,
+  "audio_master": {
+    "lufs": -14.0
+  },
+  "scenes": [
+    {
+      "id": "scene-01",
+      "svg": "scenes/scene-01.svg",
+      "narration": "[hồi hộp] Thức trắng một đêm, não bạn hoạt động gần giống một người đã uống rượu. Vậy trong lúc ta ngủ, cơ thể đang làm gì mà quan trọng đến thế?",
+      "chapter": "Mở đầu"
+    },
+    {
+      "id": "scene-02",
+      "svg": "scenes/scene-02.svg",
+      "narration": "Câu trả lời nằm ở một việc rất ít người để ý: | trong giấc ngủ sâu, não *tự dọn rác*. Dịch não tủy chảy qua các khe giữa tế bào, cuốn đi những chất thải tích tụ suốt ngày.",
+      "chapter": "Phần 1: Não tự dọn rác",
+      "pauseBeforeMs": 500
+    },
+    {
+      "id": "scene-03",
+      "svg": "scenes/scene-03.svg",
+      "narration": "Vì vậy, ngủ đủ không phải là lười. [chậm] Đó là lúc bộ não tự chữa lành cho ngày mai.",
+      "chapter": "Kết",
+      "pauseBeforeMs": 500
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 # Hướng dẫn vẽ cảnh bằng SVG (dành cho agent)
 
+> Video dài: đừng gõ SVG bằng tay. Viết cảnh bằng Python với `scripts/motifs.py` (hình mẫu cùng phong cách, `g()` tạo phần tử) và `scripts/storyboard.py` (sinh SVG + kiểm tra) – xem `examples/storyboard-mau/build.py`. Các quy ước dưới đây vẫn áp dụng cho mọi SVG được sinh ra.
+
 Claude Code / Codex không cần API tạo ảnh: agent **tự viết SVG**, `svg_scene.py` biến nó thành PNG + annotation có **nét vector thật**, nên bàn tay vẽ đúng thứ tự từng nét như người thật. Đây là đường mặc định, nhanh, rẻ, nhất quán.
 
 ## Quy ước bắt buộc
@@ -15,8 +17,8 @@ Claude Code / Codex không cần API tạo ảnh: agent **tự viết SVG**, `sv
 </svg>
 ```
 
-- Mỗi `<g id="…">` **cấp cao nhất** = một phần tử vẽ. Thứ tự trong file = thứ tự vẽ.
-- `data-say` = cụm từ **nguyên văn trong lời thoại**. Phần tử bắt đầu được vẽ ngay trước khi cụm từ đó được đọc. Phần tử đầu tiên luôn bắt đầu ngay lập tức (hook).
+- Mỗi `<g id="…">` **cấp cao nhất** = một phần tử vẽ.
+- `data-say` = cụm từ **nguyên văn trong lời thoại**. Phần tử bắt đầu được vẽ ngay trước khi cụm từ đó được đọc, nên các phần tử được vẽ **theo thứ tự cụm từ được nói** (phần tử không có `data-say` giữ thứ tự trong file). Phần tử đầu tiên bắt đầu không sớm hơn cụm từ của nó quá 1,5 giây.
 - `data-label` = tên dễ đọc (hiện trong preview/QA). `data-role` tuỳ chọn.
 - Bên trong nhóm, thứ tự các shape = thứ tự nét. Chữ `<text>` được "viết tay" từ trái sang phải.
 - Không vẽ hình chữ nhật nền phủ toàn khung (nếu có, nó được dùng làm màu giấy và bị loại bỏ).
@@ -40,6 +42,9 @@ Claude Code / Codex không cần API tạo ảnh: agent **tự viết SVG**, `sv
 - Tách các phần tử bằng khoảng trống: vùng của phần tử được tính từ chính pixel của nhóm, chồng lấn nhẹ không sao.
 - Ưu tiên `path`/`circle`/`line` đơn giản; tránh `filter`, `mask`, ảnh nhúng, gradient phức tạp.
 - Chữ trong cảnh: ngắn (1–4 từ), dùng như nhãn/từ khoá; câu dài để cho phụ đề.
+- Chỉ dùng ký tự có trong Patrick Hand: mũi tên vẽ bằng `<path>` (`arrow()`), không gõ "→" (font khác sẽ thay vào, trông lệch tông).
+- Dấu gạch chéo / dấu tích đặt cạnh nhãn, không đè lên chữ. Hình quá to dễ bị cắt ở mép trên.
+- Truyền hình: giữ nội dung trong vùng an toàn 90% (x 80–1520, y 45–855).
 
 ## Mẹo làm video "cuốn"
 
@@ -52,6 +57,7 @@ Claude Code / Codex không cần API tạo ảnh: agent **tự viết SVG**, `sv
 ## Kiểm tra nhanh
 
 ```bash
+python scripts/scene_sheet.py projects/<slug> [--safe]     # mọi cảnh, 12 cảnh/trang
 python scripts/svg_scene.py scenes/scene-01.svg --out-dir /tmp/s1
 python scripts/render_annotation_preview.py /tmp/s1/scene-01.png /tmp/s1/scene-01.annotation.json /tmp/s1/check.jpg
 ```
