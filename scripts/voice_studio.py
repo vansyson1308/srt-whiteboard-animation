@@ -592,8 +592,11 @@ def markup(text: str) -> tuple[str, dict[int, int], list[tuple[int, int]]]:
         if tok.startswith("*") and len(tok) > 1:
             open_at = len(out)
             tok = tok[1:]
-            if open_at and (open_at - 1) not in breaks:
-                breaks[open_at - 1] = BEAT_MS["|"]               # a stressed phrase is set apart
+            # a stressed phrase is set apart - unless the voice has just paused (a comma one or
+            # two words back): two stops in a row sound like stumbling, not emphasis
+            near = any(_punct(out[k]) for k in range(max(0, open_at - 2), open_at))
+            if open_at and (open_at - 1) not in breaks and not near:
+                breaks[open_at - 1] = BEAT_MS["|"]
         close = tok.rstrip("\"'”’)]».,;:!?…").endswith("*")
         if close:
             i = tok.rfind("*")
@@ -902,6 +905,7 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
         breaks, emph = discourse_breaks(display.split()) if phrasing else ({}, [])
         breaks.update(marked)                                      # the author's marks win
         emph = marked_emph or emph
+        listed = sum(1 for v in breaks.values() if v == LIST_COMMA_MS) >= 2
         spoken = prepare_spoken(_with_break_commas(display, breaks), lang, lex, phrasing)
         if not any(c.isalnum() for c in spoken):
             continue
@@ -922,6 +926,8 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
             md, inten = default_mood, 1.0
         elif auto_mood and u.type != "heading":
             md, inten = detect_mood(display)
+            if md == "fast" and listed:
+                md, inten = "neutral", 0.0          # a list is laid out item by item, not rushed
             if md == "neutral" and prev_mood[0] in ("emotional", "suspense"):
                 md, inten = prev_mood[0], 0.5 * prev_mood[1]       # a feeling lingers a little
             elif (md == "neutral" and len(speech) >= 2 and u is speech[-1] and u.type == "statement"

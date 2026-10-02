@@ -462,3 +462,11 @@ def test_shape_pauses_opens_a_planned_beat():
     out = tts.shape_pauses(text, pcm, 1.0, {cut - 1: 400})
     iv = tts._voiced_intervals(out, 30)
     assert len(iv) == 2 and abs((iv[1][0] - iv[0][1]) - 400) <= 30
+
+
+def test_no_double_stop_and_lists_are_not_rushed():
+    s = vs.plan_script("Ngài giảng bốn mươi lăm năm, nhưng *không để lại một chữ nào*.", "natural").segments[0]
+    toks = s.display.split()
+    assert toks.index("nhưng") not in s.breaks and s.emph            # stressed, without a second stop
+    lst = vs.plan_script("Ngài giảng cho vua chúa, học giả, nông dân, cả tướng cướp và kỹ nữ.", "natural").segments[0]
+    assert lst.mood != "fast" and sum(v == vs.LIST_COMMA_MS for v in lst.breaks.values()) >= 2
