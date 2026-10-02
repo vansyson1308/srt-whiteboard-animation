@@ -32,7 +32,7 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
   "header": { "text": "Tiêu đề hiện ở bản dọc" },   // false để tắt; mặc định = title
   "music":  { "file": "music/nhac-nen.mp3", "volumeDb": -20, "duck": true, "duckDb": -8 },
                                              // hoặc {"generate": "calm"|"bright"} = nhạc tự tạo, không bản quyền
-  "sfx":    { "pen": true, "volumeDb": -17 },       // tiếng bút sột soạt khi đang vẽ
+  "sfx":    { "pen": true, "volumeDb": -20 },       // tiếng bút sột soạt khi đang vẽ
   "render": { "inkPath": "skeleton", "colorFill": "contour-wipe", "camera": "follow",
               "cameraMaxZoom": 1.2, "paper": "#F6F1E3", "hand": null, "handHeightRatio": 0.42,
               "humanMotion": true,                  // nhịp tay người: chậm ở góc/cuối nét, dừng khi đặt/nhấc bút
@@ -98,7 +98,7 @@ Dấu câu cho biết câu *có thể* ngắt ở đâu; người dẫn còn ch�
 
 | Cấu trúc | Ví dụ | Cách đọc |
 |---|---|---|
-| Điểm nhấn sau câu dẫn | "Tên nhóm chỉ có bốn chữ: **con ghét bố mẹ**." · "…đó là **…**" | dừng 420 ms rồi đọc cụm chốt chậm hơn ~7 % |
+| Điểm nhấn sau câu dẫn | "Tên nhóm chỉ có bốn chữ: **con ghét bố mẹ**." · "…đó là **…**" | dừng 420 ms rồi đọc cụm chốt chậm hơn ~7 %. Không dừng sau "nghĩa là / tức là" (lời giải nghĩa đọc liền), sau phủ định ("không chỉ là"), hay khi vừa ngừng ở dấu câu ngay trước |
 | Mở đầu một danh sách / luận điểm | "…ba cái bẫy: …", "…như sau: …" | dừng 450 ms |
 | Đầu mục ngắn | "Thứ nhất: …", "Kết quả: …" | dừng 380 ms; câu mở bằng "Thứ hai", "Dấu hiệu thứ ba"… nghỉ thêm 250 ms trước nó |
 | Hai vế đối xứng | "Người lớn đọc… **/** Người trẻ đọc…" · "Có người…, có người…" | nghỉ thêm 220 ms giữa hai câu, 260 ms giữa hai vế trong một câu |
@@ -109,7 +109,7 @@ Dấu câu cho biết câu *có thể* ngắt ở đâu; người dẫn còn ch�
 Chỗ máy không tự thấy, người viết kịch bản đánh dấu thẳng trong `narration` (không hiện trong phụ đề):
 
 - `|`: một nhịp ngừng (~320 ms); `||`: nhịp ngừng dài (~600 ms).
-- `*cụm từ*`: nhấn: ngừng trước cụm đó và đọc nó chậm hơn một chút.
+- `*cụm từ*`: nhấn: đọc cụm đó chậm hơn một chút. Chỉ ngừng trước nó khi từ ngay trước là "là" / "rằng" (từ báo trước điểm nhấn); chỗ khác muốn dừng thì viết thêm `|`, vì ngừng giữa một cụm ("giống | lớp đường") nghe như người đọc bị vấp.
 
 Ví dụ: `Họ không tìm thấy một kẻ thù. | Họ tìm thấy *chính mình*.` Xem trước kế hoạch: `python scripts/voice_studio.py "…"` (trường `breaks`, `emph` của từng câu). `"phrasing": false` tắt phần tự nhận diện; dấu `|`, `*…*` vẫn có hiệu lực.
 

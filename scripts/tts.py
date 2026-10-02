@@ -1032,7 +1032,7 @@ PROSODY_DSP_ENGINES = {"vieneu", "tiktok", "makevoice", "fish"}
 # formants too, so the narrator's timbre would change from sentence to sentence.  For these
 # engines a mood is carried by tempo, loudness, crescendo and the pauses around the sentence.
 DSP_TEMPO_SCALE = 0.6
-PROSODY_VERSION = 4          # bump when mood planning / DSP changes (invalidates voice caches)
+PROSODY_VERSION = 5          # bump when mood planning / DSP changes (invalidates voice caches)
 # engines whose own pauses are left to a generative model: their silences are reshaped
 PAUSE_SHAPE_ENGINES = {"vieneu", "tiktok", "makevoice", "fish"}
 BLOCK_CHARS = {"gemini": 1500, "openai": 1500, "makevoice": 1500, "fish": 1500, "vieneu": 600}

@@ -537,7 +537,9 @@ def insert_phrase_breaks(sentence: str, lang: str = "vi") -> str:
 # read from the structure of the text (``discourse_breaks`` / ``lead_pause_ms``) and can be
 # written into the script by its author:
 #   |        a beat (~320 ms)            ||       a long beat (~600 ms)
-#   *words*  stressed: a beat before, spoken a little slower
+#   *words*  stressed: spoken a little slower; a beat before it only after a word that
+#            announces it ("... là *X*", "... rằng *X*") - elsewhere a stop would split the
+#            phrase ("nhốt trong | một nhà giam") and sound like the reader stumbled
 # Both are removed from captions.  Break lengths are base values, scaled like every pause.
 BEAT_MS = {"|": 320, "||": 600}
 REVEAL_MS = 420            # colon or lead-in before a short phrase that lands as the point
@@ -556,8 +558,12 @@ EMPH_RATE = -7             # stressed words are spoken this much slower (%)
 
 _NUM_WORDS = {"một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín", "mười", "mấy", "vài", "nhiều"}
 _REVEAL_LEADS = [("chỉ", "có"), ("tên", "là"), ("gọi", "là"), ("gọi", "đó", "là"), ("chính", "là"),
-                 ("câu", "trả", "lời", "là"), ("đáp", "án", "là"), ("đó", "là"), ("ấy", "là"), ("chỉ", "là"),
-                 ("nghĩa", "là"), ("tức", "là")]
+                 ("câu", "trả", "lời", "là"), ("đáp", "án", "là"), ("đó", "là"), ("ấy", "là"), ("chỉ", "là")]
+# "nghĩa là", "tức là" gloss a word - the gloss flows on, it is not a reveal.  After a
+# negation ("không chỉ là", "không phải là") the phrase is not the point either.
+_NEGATIONS = {"không", "chẳng", "chả", "chưa"}
+# words after which a stressed phrase may be set apart by a beat: they announce it
+_STRESS_LEADS = {"là", "rằng"}
 _CONTRAST_NEXT = {"còn", "nhưng", "mà", "chứ", "song", "ngược", "trái", "thế"}
 _CONTRAST_OPENERS = {"còn", "nhưng", "ngược", "song", "tuy", "thế"}
 _LIST_INTRO_TAIL = [("như", "sau"), ("sau", "đây"), ("gồm",), ("bao", "gồm")]
@@ -595,7 +601,7 @@ def markup(text: str) -> tuple[str, dict[int, int], list[tuple[int, int]]]:
             # a stressed phrase is set apart - unless the voice has just paused (a comma one or
             # two words back): two stops in a row sound like stumbling, not emphasis
             near = any(_punct(out[k]) for k in range(max(0, open_at - 2), open_at))
-            if open_at and (open_at - 1) not in breaks and not near:
+            if open_at and (open_at - 1) not in breaks and not near and _word(out[-1]) in _STRESS_LEADS:
                 breaks[open_at - 1] = BEAT_MS["|"]
         close = tok.rstrip("\"'”’)]».,;:!?…").endswith("*")
         if close:
@@ -645,7 +651,9 @@ def discourse_breaks(toks: list[str]) -> tuple[dict[int, int], list[tuple[int, i
     for lead in _REVEAL_LEADS:
         L = len(lead)
         for j in range(n - L):
-            if tuple(w[j:j + L]) != lead or not clean_run(j, j + L):
+            if tuple(w[j:j + L]) != lead or not clean_run(j, j + L) or (j and w[j - 1] in _NEGATIONS):
+                continue
+            if any(p[x] for x in range(max(0, j - 2), j)):   # the voice has just paused: no second stop
                 continue
             k = j + L - 1
             if lead == ("chỉ", "có"):                    # "chỉ có [số] chữ/từ/câu/điều ..."

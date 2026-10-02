@@ -63,6 +63,7 @@ RENDERER_HASH = hashlib.sha256(b"".join(
     (SCRIPTS / f).read_bytes() for f in ("render_stream_whiteboard.py", "stream_render.py"))).hexdigest()[:16]
 SVG_BUILDER_HASH = hashlib.sha256((SCRIPTS / "svg_scene.py").read_bytes()).hexdigest()[:16]
 SR = wv.SAMPLE_RATE
+PEN_VOLUME_DB = -20.0     # pen scratch level before mastering (audible, under the voice)
 SYNC_LATE_MS = 400       # pen down this long after its phrase is spoken reads as "drawing lags the voice"
 
 
@@ -530,7 +531,7 @@ def build_audio(voices: list[SceneVoice], scene_frames: list[int], fps: int, pro
     if sfx.get("pen", True) and activities:
         act = np.concatenate([a[:nf] if len(a) >= nf else np.pad(a, (0, nf - len(a)))
                               for a, nf in zip(activities, scene_frames)])
-        s = pen_sfx(act, fps, total) * (10 ** (float(sfx.get("volumeDb", -17)) / 20))
+        s = pen_sfx(act, fps, total) * (10 ** (float(sfx.get("volumeDb", PEN_VOLUME_DB)) / 20))
         mix = mix + s
     if not has_voice and not music_cfg.get("file") and not sfx.get("pen", True):
         return None

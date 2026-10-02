@@ -446,7 +446,9 @@ def test_delivery_beats_follow_the_structure():
 def test_author_marks_beats_and_stress():
     s = vs.plan_script("Đó là | một câu hỏi *rất khó*. Hết.", "natural", phrasing=False).segments[0]
     assert s.display == "Đó là một câu hỏi rất khó."
-    assert s.breaks == {1: vs.BEAT_MS["|"], 4: vs.BEAT_MS["|"]} and s.emph == [[5, 6]]
+    assert s.breaks == {1: vs.BEAT_MS["|"]} and s.emph == [[5, 6]]       # stressed, not cut off its noun
+    lead = vs.plan_script("Câu trả lời là *không*.", "natural", phrasing=False).segments[0]
+    assert lead.breaks == {3: vs.BEAT_MS["|"]}                              # "là" announces it: a beat
     assert vs.strip_pause_tags("Đó là || một câu hỏi *rất khó*. [ngắt 1s] Hết.") == "Đó là một câu hỏi rất khó. Hết."
     assert not vs.plan_script("Tên nhóm chỉ có bốn chữ: con ghét bố mẹ.", phrasing=False).segments[0].breaks
 
@@ -470,3 +472,17 @@ def test_no_double_stop_and_lists_are_not_rushed():
     assert toks.index("nhưng") not in s.breaks and s.emph            # stressed, without a second stop
     lst = vs.plan_script("Ngài giảng cho vua chúa, học giả, nông dân, cả tướng cướp và kỹ nữ.", "natural").segments[0]
     assert lst.mood != "fast" and sum(v == vs.LIST_COMMA_MS for v in lst.breaks.values()) >= 2
+
+
+def test_no_stop_inside_a_phrase():
+    """A stressed phrase or a gloss must not be cut off from the words it belongs to."""
+    def beats(text):
+        seg = vs.plan_script(text, "natural", auto_mood=False).segments[0]
+        toks = seg.display.split()
+        return {toks[int(k)] for k in seg.breaks if not vs._punct(toks[int(k)])}
+    assert not beats("Khi giận, ta như bị nhốt trong *một nhà giam do chính mình dựng*.")
+    assert not beats("Niềm vui giống *lớp đường mỏng bọc viên thuốc đắng*.")
+    assert not beats("Kinh gọi ông là vua chuyển luân, nghĩa là vị vua lăn bánh xe.")    # a gloss flows on
+    assert not beats("Chữ chánh ở đây cũng không chỉ là đúng hay sai.")                 # negated: not a reveal
+    assert not beats("Cho tới khi thấy: khổ chỉ là phần ngọn.")                         # just paused at the colon
+    assert beats("Người trẻ nhất ấy tên là Kiều Trần Như.") == {"là"}                  # a real reveal stays

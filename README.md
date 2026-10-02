@@ -271,7 +271,7 @@ Chỗ máy không tự thấy, người viết đánh dấu trong lời thoại.
 
 - `|`: một nhịp ngừng (~320 ms);
 - `||`: ngừng dài (~600 ms);
-- `*cụm từ*`: nhấn – ngừng trước cụm đó và đọc nó chậm hơn.
+- `*cụm từ*`: nhấn – đọc cụm đó chậm và rõ hơn. Chỉ ngừng trước nó khi có từ báo trước ("… là *X*", "… rằng *X*"); muốn dừng ở chỗ khác thì viết `|`. Không tự ngừng giữa một cụm ("nhốt trong | một nhà giam" nghe như vấp).
 
 Xem trước cách đọc mà không cần tạo giọng:
 

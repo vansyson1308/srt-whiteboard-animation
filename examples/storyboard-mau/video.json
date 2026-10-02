@@ -20,7 +20,7 @@
   },
   "sfx": {
     "pen": true,
-    "volumeDb": -19
+    "volumeDb": -22
   },
   "render": {
     "camera": "follow",
