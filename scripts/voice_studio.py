@@ -290,8 +290,8 @@ def _tag_ms(m: re.Match) -> int:
 
 
 def strip_pause_tags(text: str) -> str:
-    """The text a viewer should see: pause and mood tags removed, whitespace collapsed."""
-    return re.sub(r"\s+", " ", MOOD_TAG.sub(" ", PAUSE_TAG.sub(" ", text))).strip()
+    """The text a viewer should see: pause / mood tags and delivery marks removed."""
+    return markup(re.sub(r"\s+", " ", MOOD_TAG.sub(" ", PAUSE_TAG.sub(" ", text))).strip())[0]
 
 
 def _take_moods(text: str) -> tuple[str, list[tuple[int, str]]]:
@@ -527,6 +527,198 @@ def insert_phrase_breaks(sentence: str, lang: str = "vi") -> str:
 
 
 # ──────────────────────────────────────────────────────────────
+# Delivery: where a presenter takes a beat
+# ──────────────────────────────────────────────────────────────
+# Punctuation says where a sentence may break; a presenter also decides where it *should*:
+# a beat before the word that is being revealed ("Tên nhóm chỉ có bốn chữ: | con ghét bố
+# mẹ"), a breath between two mirrored halves so the contrast is heard ("Người lớn đọc...
+# | Người trẻ đọc..."), points of an argument laid out one by one ("Thứ nhất: ..."), items
+# of a list read deliberately, the short line that closes a thought given room.  These are
+# read from the structure of the text (``discourse_breaks`` / ``lead_pause_ms``) and can be
+# written into the script by its author:
+#   |        a beat (~320 ms)            ||       a long beat (~600 ms)
+#   *words*  stressed: a beat before, spoken a little slower
+# Both are removed from captions.  Break lengths are base values, scaled like every pause.
+BEAT_MS = {"|": 320, "||": 600}
+REVEAL_MS = 420            # colon or lead-in before a short phrase that lands as the point
+HEAD_COLON_MS = 380        # "Thứ nhất:", "Kết quả:" - a short head announcing what follows
+LIST_INTRO_MS = 450        # "...ba cái bẫy:", "...như sau:" - the listener braces for a list
+LIST_COMMA_MS = 240        # between short items of a list
+CONTRAST_MS = 280          # ", còn ...", ", nhưng ...", ", mà là ..."
+CONTRAST_NO_COMMA_MS = 220
+PARALLEL_MS = 220          # extra rest before the mirrored second half of a parallel pair
+PARALLEL_INNER_MS = 260    # the same, inside one sentence ("..., điều thứ hai ...")
+ORDINAL_MS = 250           # extra rest before "Thứ hai: ...", "Dấu hiệu thứ ba: ..."
+CONTRAST_OPEN_MS = 150     # extra rest before a sentence opening with "Còn", "Nhưng" ...
+PUNCHLINE_MS = 150         # extra rest before a short line closing a long one
+MAX_LEAD_MS = 350
+EMPH_RATE = -7             # stressed words are spoken this much slower (%)
+
+_NUM_WORDS = {"một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín", "mười", "mấy", "vài", "nhiều"}
+_REVEAL_LEADS = [("chỉ", "có"), ("tên", "là"), ("gọi", "là"), ("gọi", "đó", "là"), ("chính", "là"),
+                 ("câu", "trả", "lời", "là"), ("đáp", "án", "là"), ("đó", "là"), ("ấy", "là"), ("chỉ", "là"),
+                 ("nghĩa", "là"), ("tức", "là")]
+_CONTRAST_NEXT = {"còn", "nhưng", "mà", "chứ", "song", "ngược", "trái", "thế"}
+_CONTRAST_OPENERS = {"còn", "nhưng", "ngược", "song", "tuy", "thế"}
+_LIST_INTRO_TAIL = [("như", "sau"), ("sau", "đây"), ("gồm",), ("bao", "gồm")]
+_ORDINAL = re.compile(r"^(thứ (nhất|hai|ba|tư|năm|sáu|bảy)|(một|hai|ba|bốn|năm) là|điều thứ|dấu hiệu thứ|bẫy thứ"
+                      r"|bước (một|hai|ba|bốn|năm|đầu|cuối)|đầu tiên|cuối cùng|trước hết|sau cùng)\b")
+_BREAK_PUNCT = ",;:.!?…—–"
+
+
+def _word(tok: str) -> str:
+    return unicodedata.normalize("NFC", tok).lower().strip("\"'“”‘’()[]«»*").rstrip(_BREAK_PUNCT + "\"'”’)")
+
+
+def _punct(tok: str) -> str:
+    c = tok.rstrip("\"'”’)]»")[-1:]
+    return c if c in _BREAK_PUNCT else ""
+
+
+def markup(text: str) -> tuple[str, dict[int, int], list[tuple[int, int]]]:
+    """Read the author's delivery marks: ``|`` / ``||`` beats and ``*stressed words*``.
+    Returns the clean text, ``{token index: beat ms}`` (a beat *after* that token) and the
+    stressed token spans ``(first, last)``."""
+    t = re.sub(r"\s*(\|\|?)\s*", r" \1 ", text)
+    out: list[str] = []
+    breaks: dict[int, int] = {}
+    emph: list[tuple[int, int]] = []
+    open_at = None
+    for tok in t.split():
+        if tok in BEAT_MS:
+            if out:
+                breaks[len(out) - 1] = max(breaks.get(len(out) - 1, 0), BEAT_MS[tok])
+            continue
+        if tok.startswith("*") and len(tok) > 1:
+            open_at = len(out)
+            tok = tok[1:]
+            if open_at and (open_at - 1) not in breaks:
+                breaks[open_at - 1] = BEAT_MS["|"]               # a stressed phrase is set apart
+        close = tok.rstrip("\"'”’)]».,;:!?…").endswith("*")
+        if close:
+            i = tok.rfind("*")
+            tok = tok[:i] + tok[i + 1:]
+        if tok:
+            out.append(tok)
+        if close and open_at is not None and out:
+            emph.append((open_at, len(out) - 1))
+            open_at = None
+    return " ".join(out), breaks, emph
+
+
+def discourse_breaks(toks: list[str]) -> tuple[dict[int, int], list[tuple[int, int]]]:
+    """Beats a presenter takes inside one sentence, read from its structure.
+
+    Returns ``{token index: ms}`` (rest after that token) and stressed spans."""
+    n = len(toks)
+    w = [_word(t) for t in toks]
+    p = [_punct(t) for t in toks]
+    breaks: dict[int, int] = {}
+    emph: list[tuple[int, int]] = []
+    if n < 3:
+        return breaks, emph
+
+    def clean_run(a: int, b: int) -> bool:          # no inner break punctuation in toks[a:b]
+        return all(not p[k] for k in range(a, b))
+
+    # colons: a head ("Thứ nhất:"), a list intro ("ba cái bẫy:"), or the lead-in to a short point
+    for i in range(n - 1):
+        if p[i] != ":":
+            continue
+        rest = n - 1 - i
+        head = i + 1 - max((k + 1 for k in range(i) if p[k]), default=0)
+        listy = "," in p[i + 1:]                     # what follows is itself a list
+        intro = any(tuple(w[i - len(t) + 1:i + 1]) == t for t in _LIST_INTRO_TAIL) or \
+            (listy and any(x in _NUM_WORDS or x.isdigit() for x in w[max(0, i - 3):i + 1]))
+        if intro and rest >= 3:
+            breaks[i] = LIST_INTRO_MS
+        elif rest <= 7 and clean_run(i + 1, n - 1):
+            breaks[i] = REVEAL_MS
+            if rest <= 5:
+                emph.append((i + 1, n - 1))
+        elif head <= 4:
+            breaks[i] = HEAD_COLON_MS
+    # lead-ins without a colon: "chỉ có bốn chữ | con ghét bố mẹ", "đó là | ..."
+    for lead in _REVEAL_LEADS:
+        L = len(lead)
+        for j in range(n - L):
+            if tuple(w[j:j + L]) != lead or not clean_run(j, j + L):
+                continue
+            k = j + L - 1
+            if lead == ("chỉ", "có"):                    # "chỉ có [số] chữ/từ/câu/điều ..."
+                m = k + 1
+                if m < n and (w[m] in _NUM_WORDS or w[m].isdigit()):
+                    m += 1
+                if m >= n or w[m] not in ("chữ", "từ", "câu", "điều", "cách", "việc") or not clean_run(k, m):
+                    continue
+                k = m
+            rest = n - 1 - k
+            if 1 <= rest <= 6 and clean_run(k, n - 1) and k not in breaks and k + 1 < n:
+                breaks[k] = REVEAL_MS - 40
+                if rest <= 5:
+                    emph.append((k + 1, n - 1))
+    # contrast: ", còn ...", ", nhưng ...", "không phải A mà là B"
+    for i in range(n - 1):
+        if p[i] == "," and w[i + 1] in _CONTRAST_NEXT:
+            breaks[i] = max(breaks.get(i, 0), CONTRAST_MS)
+        elif not p[i] and i >= 3 and (w[i + 1:i + 3] == ["mà", "là"] or w[i + 1:i + 3] == ["chứ", "không"]):
+            breaks[i] = max(breaks.get(i, 0), CONTRAST_NO_COMMA_MS)
+    # mirrored clauses inside one sentence: "điều thứ nhất là học, điều thứ hai là hành"
+    starts = [0] + [k + 1 for k in range(n - 1) if p[k]]
+    for a, b in zip(starts, starts[1:]):
+        if b + 1 < n and w[a:a + 2] == w[b:b + 2] and b - a >= 3:
+            breaks[b - 1] = max(breaks.get(b - 1, 0), PARALLEL_INNER_MS)
+    # lists: three or more short items in a row ("khóc, gào, đòi hỏi")
+    cuts = [-1] + [k for k in range(n - 1) if p[k] and p[k] in ",:;"] + [n - 1]
+    items = [(cuts[k] + 1, cuts[k + 1]) for k in range(len(cuts) - 1)]
+    run: list[int] = []
+    for idx, (a, b) in enumerate(items + [(0, 10 ** 6)]):
+        short = idx < len(items) and b - a + 1 <= 5 and p[b] != ":"     # a list intro is not an item
+        if short:
+            run.append(idx)
+            continue
+        if len(run) >= 3:
+            for r in run[:-1]:
+                c = items[r][1]
+                if p[c] == ",":
+                    breaks[c] = max(breaks.get(c, 0), LIST_COMMA_MS)
+        run = []
+    return breaks, emph
+
+
+def lead_pause_ms(prev: str, cur: str) -> int:
+    """Extra rest before sentence ``cur`` (after ``prev``) for the shape of the argument:
+    the mirrored half of a parallel pair, the next point of a list, a contrast, a punchline."""
+    a = [_word(t) for t in prev.split()]
+    b = [_word(t) for t in cur.split()]
+    if not a or not b:
+        return 0
+    extra = 0
+    head = " ".join(b[:4])
+    if _ORDINAL.match(head):
+        extra = max(extra, ORDINAL_MS)
+    if (a[:2] == b[:2] and len(b) > 2) or (a[0] == b[0] and len(set(a[1:7]) & set(b[1:7])) >= 2):
+        extra = max(extra, PARALLEL_MS)
+    if b[0] in _CONTRAST_OPENERS:
+        extra = max(extra, CONTRAST_OPEN_MS)
+    if any(tuple(a[-len(t):]) == t for t in _LIST_INTRO_TAIL):
+        extra = max(extra, LIST_INTRO_MS - 250)
+    if len(b) <= 7 and len(a) >= 14 and _classify(cur) == "statement":
+        extra = max(extra, PUNCHLINE_MS)
+    return min(extra, MAX_LEAD_MS)
+
+
+def _with_break_commas(display: str, breaks: dict[int, int]) -> str:
+    """The text to speak: a comma at every beat that has no punctuation, so the voice
+    closes the phrase there (the pause length itself is set after synthesis)."""
+    toks = display.split()
+    for i in breaks:
+        if 0 <= i < len(toks) - 1 and not _punct(toks[i]):
+            toks[i] += ","
+    return " ".join(toks)
+
+
+# ──────────────────────────────────────────────────────────────
 # Pronunciation lexicon (lexicon.ts, conservative subset)
 # ──────────────────────────────────────────────────────────────
 VI_LEXICON: list[tuple[str, str]] = [
@@ -629,6 +821,8 @@ class Segment:
     mood_st: float = 0.0
     gain_db: float = 0.0
     ramp_db: float = 0.0            # loudness change across the sentence (crescendo > 0)
+    breaks: dict = field(default_factory=dict)   # display token index -> beat (ms, unscaled) after it
+    emph: list = field(default_factory=list)     # stressed display token spans [first, last]
 
 
 @dataclass
@@ -674,6 +868,8 @@ def prepare_spoken(display: str, lang: str, lexicon: list[tuple[str, str]], phra
 
 
 HZ_PER_SEMITONE = 8.0      # Edge prosody pitch is in Hz; ~8 Hz = one semitone for a narrator
+SAME_MOOD_PAUSE = 0.3      # share of a mood's extra pause kept between two sentences of the same mood
+MAX_AUTO_PAUSE_MS = 1000   # longest automatic pause between two sentences of one narration
 
 
 def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch: str | float = 0,
@@ -696,12 +892,17 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
     prev_after, prev_mood = 0.0, ("neutral", 0.0)
     units = segment_script(text)
     speech = [x for x in units if x.kind == "speech"]
+    prev_display = None
     for u in units:
         if u.kind == "pause":
             manual += u.ms
             saw_tag = True
             continue
-        spoken = prepare_spoken(u.text, lang, lex, phrasing)
+        display, marked, marked_emph = markup(u.text)
+        breaks, emph = discourse_breaks(display.split()) if phrasing else ({}, [])
+        breaks.update(marked)                                      # the author's marks win
+        emph = marked_emph or emph
+        spoken = prepare_spoken(_with_break_commas(display, breaks), lang, lex, phrasing)
         if not any(c.isalnum() for c in spoken):
             continue
         auto = 0.0
@@ -711,6 +912,8 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
                 auto = max(auto, preset["pauses"]["afterHeading"])
             elif prev_type == "question" and u.boundary != "clause":
                 auto = max(auto, preset["pauses"]["afterQuestion"])
+            if phrasing and prev_display and u.boundary == "sentence":
+                auto += lead_pause_ms(prev_display, display)          # the shape of the argument
             auto *= pause_scale
         # how this sentence should feel: tag > scene mood > automatic reading
         if u.mood:
@@ -718,7 +921,7 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
         elif default_mood:
             md, inten = default_mood, 1.0
         elif auto_mood and u.type != "heading":
-            md, inten = detect_mood(u.text)
+            md, inten = detect_mood(display)
             if md == "neutral" and prev_mood[0] in ("emotional", "suspense"):
                 md, inten = prev_mood[0], 0.5 * prev_mood[1]       # a feeling lingers a little
             elif (md == "neutral" and len(speech) >= 2 and u is speech[-1] and u.type == "statement"
@@ -731,7 +934,12 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
         if auto > 0:
             auto *= 1.0 + (mp["pace"] - 1.0) * k
         if plan.segments:
-            auto += max(mp["before"] * k, prev_after) * pause_scale   # one breath, not two
+            extra = max(mp["before"] * k, prev_after)               # one breath, not two
+            if md == prev_mood[0] and md != "neutral":
+                extra *= SAME_MOOD_PAUSE       # inside a run of one mood the dramatic beat is not repeated
+            auto += extra * pause_scale
+            if u.boundary in ("sentence", "clause"):              # paragraphs keep their longer rest
+                auto = min(auto, MAX_AUTO_PAUSE_MS * pause_scale)
         r, p = preset["rate"] + user_rate, preset["pitch"] + user_pitch
         tweaks = []
         if u.type in ("heading", "question", "exclamation"):
@@ -747,12 +955,13 @@ def plan_script(text: str, style: str = "natural", rate: str | float = 0, pitch:
         p += mp["st"] * k * HZ_PER_SEMITONE
         has_prev = bool(plan.segments)
         plan.segments.append(Segment(
-            len(plan.segments), u.text, spoken, u.type, u.paragraph, u.boundary, saw_tag and has_prev,
+            len(plan.segments), display, spoken, u.type, u.paragraph, u.boundary, saw_tag and has_prev,
             int(max(-50, min(100, round(r)))), int(max(-50, min(50, round(p)))),
             int(round((manual if saw_tag else auto) if has_prev else manual)),
             md, round(inten, 3), round(mp["rate"] * k, 2), round(mp["st"] * k, 3),
-            round(mp["gain"] * k, 2), round(mp["ramp"] * k, 2)))
-        manual, saw_tag, prev_type = 0, False, u.type
+            round(mp["gain"] * k, 2), round(mp["ramp"] * k, 2),
+            {int(i): int(v) for i, v in sorted(breaks.items())}, [list(e) for e in emph]))
+        manual, saw_tag, prev_type, prev_display = 0, False, u.type, display
         prev_after, prev_mood = mp["after"] * k, (md, inten)
     plan.trailing_pause_ms = manual
     return plan

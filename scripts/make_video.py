@@ -63,7 +63,6 @@ RENDERER_HASH = hashlib.sha256(b"".join(
     (SCRIPTS / f).read_bytes() for f in ("render_stream_whiteboard.py", "stream_render.py"))).hexdigest()[:16]
 SVG_BUILDER_HASH = hashlib.sha256((SCRIPTS / "svg_scene.py").read_bytes()).hexdigest()[:16]
 SR = wv.SAMPLE_RATE
-MAX_TAIL_EXTRA_MS = 1200  # a scene may run this much past its narration so its last drawing isn't rushed
 SYNC_LATE_MS = 400       # pen down this long after its phrase is spoken reads as "drawing lags the voice"
 
 
@@ -114,7 +113,8 @@ DEFAULTS = {
     "render": {"inkPath": "skeleton", "colorFill": "contour-wipe", "camera": "follow", "cameraMaxZoom": 1.2,
                "paper": "#F6F1E3", "hand": None, "handHeightRatio": 0.42, "humanMotion": True, "penLift": 14,
                "idleHand": "exit", "drawSpeed": 1100},
-    "sync": {"leadMs": 250, "voiceDelayMs": 200, "minDrawMs": 900, "maxDrawMs": 4500, "tailMs": 800},
+    "sync": {"leadMs": 250, "voiceDelayMs": 200, "minDrawMs": 900, "maxDrawMs": 4500, "tailMs": 700,
+             "maxHoldMs": 500},
     "transition": {"type": "fade", "ms": 350},
     "audio_master": {"lufs": -14.0},
 }
@@ -195,8 +195,8 @@ class SceneVoice:
         self.fixed_ms = fixed_ms      # scene length imposed by an external audio track
 
 
-VOICE_KEYS = ("voice", "style", "rate", "pitch", "pauseScale", "phrasing", "lexicon", "instructions",
-              "language", "reference", "referenceText", "confirmAuthorizedVoice", "chunk",
+VOICE_KEYS = ("voice", "style", "rate", "pitch", "pauseScale", "phrasing", "pauseShaping", "lexicon",
+              "instructions", "language", "reference", "referenceText", "confirmAuthorizedVoice", "chunk",
               "mood", "expressiveness", "autoMood")
 
 
@@ -213,6 +213,16 @@ def scene_voice_cfg(scene: dict, voice: dict, pdir: Path) -> dict:
     if cfg.get("reference"):
         cfg["reference"] = str((pdir / cfg["reference"]).resolve())
     return cfg
+
+
+def longest_scene_ms(v: SceneVoice, scfg: dict) -> int:
+    """A scene ends at most ``tailMs + maxHoldMs`` after its last word.
+
+    Between two scenes the listener hears the tail of one, the voice delay of the next and
+    nothing else: a presenter's paragraph rest (~1 s), not a gap that grows whenever the
+    last drawing is slow.  The pen may run up to ``maxHoldMs`` past the tail; beyond that
+    the renderer draws the last strokes a little faster instead."""
+    return int(v.speech_end + int(scfg.get("tailMs", 700)) + int(scfg.get("maxHoldMs", 500)))
 
 
 def tts_scene(scene: dict, voice: dict, bdir: Path, delay_ms: int, engine_override: str | None,
@@ -255,7 +265,8 @@ def tts_scene(scene: dict, voice: dict, bdir: Path, delay_ms: int, engine_overri
                              mood=cfg.get("mood"),
                              expressiveness=float(cfg["expressiveness"]) if cfg.get("expressiveness")
                              is not None else 1.0,
-                             auto_mood=cfg.get("autoMood", True) is not False)
+                             auto_mood=cfg.get("autoMood", True) is not False,
+                             pause_shaping=cfg.get("pauseShaping", True) is not False)
         meta.write_text(json.dumps(res.to_json(), ensure_ascii=False), encoding="utf-8")
     audio = wv.polish_voice(wv.load_audio(res.audio), voice.get("fx", "broadcast"))
     audio = np.concatenate([wv.silence(delay_ms), audio])
@@ -660,7 +671,9 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
             ids = [s["id"] for s in proj["scenes"]]
             voices = [voices[ids.index(s["id"])] for s in scenes_cfg]
     elif proj.get("voice"):
-        voices = [tts_scene(s, proj["voice"], bdir, int(scfg["voiceDelayMs"]), engine_override, pdir)
+        # "pauseBeforeMs" on a scene: a longer rest before it (a new chapter, a change of topic)
+        voices = [tts_scene(s, proj["voice"], bdir, int(scfg["voiceDelayMs"]) + int(s.get("pauseBeforeMs") or 0),
+                            engine_override, pdir)
                   for s in scenes_cfg]
     else:
         voices = [SceneVoice(None, [], 0) for _ in scenes_cfg]
@@ -679,6 +692,8 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
             ms = timing.schedule(els, v.words, v.speech_end, sopts)
         else:
             ms = int(ann.get("sceneDurationMs") or timing.schedule_without_voice(els, opts=sopts))
+        if v.words and not v.fixed_ms and not sc.get("keepTiming"):
+            ms = min(ms, longest_scene_ms(v, scfg))          # the narration does not wait long for the pen
         if v.fixed_ms:
             fit_elements(els, v.fixed_ms - 400)
             ms = v.fixed_ms
@@ -706,7 +721,7 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
                 plans = list(ex.map(_plan_job, [j for _, j in tjobs]))
             extra = 0
             for (i, _), pl in zip(tjobs, plans):
-                need = min(pl["drawEndMs"] + pl["fadeMs"] + 500, durations[i] + MAX_TAIL_EXTRA_MS)
+                need = min(pl["drawEndMs"] + pl["fadeMs"] + 500, longest_scene_ms(voices[i], scfg))
                 if need > durations[i]:
                     extra += need - durations[i]
                     durations[i] = need
