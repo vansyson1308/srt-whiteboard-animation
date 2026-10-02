@@ -78,6 +78,7 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
 | `keepTiming` | `true` = giữ nguyên thời gian trong annotation, không đồng bộ theo giọng. |
 | `minMs` | Độ dài tối thiểu của cảnh. |
 | `pauseBeforeMs` | Nghỉ thêm trước lời đọc của cảnh này, ví dụ `500` khi sang chương mới. |
+| `chapter` | Tên chương mà cảnh này mở đầu (vd. `"Phần 1: Hiểu chính mình"`); `storyboard.py` tự đặt từ bảng `chapter()`, `export_script.py` dùng để in mốc chương. Không ảnh hưởng tới render. |
 
 ## Nhịp đọc như người dẫn
 

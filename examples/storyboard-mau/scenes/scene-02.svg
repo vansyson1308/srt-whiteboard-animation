@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <!-- Phần 1: não dọn rác khi ngủ -->
+  <g id="chap" data-label="Phần 1: Não tự dọn rác" data-say="Câu trả lời">
+    <text x="800" y="60" text-anchor="middle" font-family="Patrick Hand" font-size="40" fill="#e8743b">PHẦN 1</text>
+    <text x="800" y="130" text-anchor="middle" font-family="Patrick Hand" font-size="70" fill="#2b2b2b">Não tự dọn rác</text>
+    <path d="M584 160 C 728 174, 872 174, 1016 158" fill="none" stroke="#e8743b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="clean" data-label="Não dọn rác" data-say="tự dọn rác">
+    <path d="M379 531 Q 357 443 434 426 Q 478 388 533 416 Q 610 399 626 476 Q 654 542 588 580 Q 522 608 456 586 Q 390 586 379 531 Z" fill="#f7c6d0" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M500 421 Q 478 476 511 520 Q 533 553 500 586 M423 476 q 30 10 30 40 M555 454 q -10 30 30 40" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M330 640 q 21 -14 42 0 q 21 14 42 0 q 21 -14 42 0 q 21 14 42 0 q 21 -14 42 0 q 21 14 42 0 q 21 -14 42 0 q 21 14 42 0" fill="none" stroke="#3b7dd8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="waste" data-label="Chất thải tích tụ" data-say="chất thải">
+    <circle cx="1100" cy="520" r="18" fill="#9a9a9a" stroke="#2b2b2b" stroke-width="4"/>
+    <circle cx="1160" cy="480" r="18" fill="#9a9a9a" stroke="#2b2b2b" stroke-width="4"/>
+    <circle cx="1210" cy="550" r="18" fill="#9a9a9a" stroke="#2b2b2b" stroke-width="4"/>
+    <path d="M1000 520 L 1300 520 M1280 530 L 1300 520 L 1280 510" fill="none" stroke="#3b7dd8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -5,6 +5,7 @@ Pillow>=10
 edge-tts>=7.0
 resvg-py>=0.2
 svgelements>=1.9
+fonttools>=4.40
 # optional voice engines: vieneu (offline Vietnamese TTS), fish-audio-sdk
 # dev
 pytest>=8

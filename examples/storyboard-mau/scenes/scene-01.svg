@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <!-- Hook -->
+  <g id="night" data-label="Thức trắng" data-say="Thức trắng một đêm">
+    <circle cx="300" cy="300" r="90" fill="#e6e6e6" stroke="#2b2b2b" stroke-width="6"/>
+    <circle cx="273" cy="282" r="16" fill="#ffffff" stroke="#9a9a9a" stroke-width="4"/>
+    <circle cx="332" cy="322" r="12" fill="#ffffff" stroke="#9a9a9a" stroke-width="4"/>
+    <circle cx="309" cy="260" r="8" fill="#ffffff" stroke="#9a9a9a" stroke-width="3"/>
+    <circle cx="300" cy="551" r="31" fill="#ffffff" stroke="#2b2b2b" stroke-width="5"/>
+    <path d="M289 544 l 0 3 M311 544 l 0 3 M289 566 q 11 -10 22 0" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M300 582 L 300 683 M267 760 L 300 683 L 333 760" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M258 661 L 300 604 L 342 661" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="brain" data-label="Não như say rượu" data-say="uống rượu">
+    <path d="M690 430 Q 670 350 740 335 Q 780 300 830 325 Q 900 310 915 380 Q 940 440 880 475 Q 820 500 760 480 Q 700 480 690 430 Z" fill="#f7c6d0" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M800 330 Q 780 380 810 420 Q 830 450 800 480 M730 380 q 30 10 30 40 M850 360 q -10 30 30 40" fill="none" stroke="#2b2b2b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M932 612 L 1028 612 L 1020 700 L 940 700 Z" fill="#ffffff" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M1026 628 q 36 5 28 32 q -8 20 -34 20" fill="none" stroke="#2b2b2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M960 596 q -15 -25 0 -50 M992 596 q -15 -25 0 -50" fill="none" stroke="#9a9a9a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g id="q" data-label="Câu hỏi" data-say="cơ thể đang làm gì">
+    <path d="M1265 356 Q 1268 305 1310 305 Q 1354 308 1348 353 Q 1342 385 1303 404 L 1303 436" fill="none" stroke="#e04b3a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="1303" cy="474" r="8" fill="#e04b3a" stroke="#e04b3a" stroke-width="4"/>
+  </g>
+</svg>

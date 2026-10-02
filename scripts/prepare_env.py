@@ -33,6 +33,7 @@ DEPS: dict[str, str] = {
     "edge_tts": "edge-tts",  # free neural TTS (Vietnamese voices) with word timings
     "resvg_py": "resvg-py",  # SVG -> PNG without system libraries
     "svgelements": "svgelements",  # SVG path geometry -> vector pen strokes
+    "fontTools": "fonttools",  # storyboard.py: check every scene text has glyphs in the hand font
 }
 # optional: best free Vietnamese voice (offline VieNeu-TTS); if it can't be installed the
 # pipeline falls back to edge-tts, so a failure here never blocks the environment

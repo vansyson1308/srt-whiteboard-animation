@@ -2,7 +2,9 @@
 
 Repo này biến một chủ đề / kịch bản / SRT thành video whiteboard vẽ tay có giọng đọc tiếng Việt.
 
-- Quy trình làm video từ một prompt: **[SKILL.md](SKILL.md)** – đọc và làm theo.
+- Quy trình làm video từ một prompt: **[SKILL.md](SKILL.md)** – đọc và làm theo. Tổng quan, tiêu chuẩn chất lượng: [README.md](README.md).
+- Viết dự án bằng Python: `scripts/motifs.py` (hình mẫu) + `scripts/storyboard.py` (dựng + kiểm tra); mẫu `examples/storyboard-mau/build.py`. Soát cảnh: `scripts/scene_sheet.py`; xem trước cách đọc: `scripts/voice_studio.py "…"`; giao: `scripts/share_video.py`, `scripts/export_script.py`.
+- `projects/` là việc riêng của người dùng: không commit (thêm vào `.git/info/exclude`).
 - Vẽ cảnh bằng SVG: [docs/SVG_GUIDE.md](docs/SVG_GUIDE.md). Schema dự án: [docs/PROJECT_FORMAT.md](docs/PROJECT_FORMAT.md).
 - Môi trường: `python scripts/prepare_env.py` → dùng interpreter `ENV_PY` in ra ở dòng cuối.
 - Lệnh chính: `$ENV_PY scripts/make_video.py <dự án>/video.json [--draft]`.
