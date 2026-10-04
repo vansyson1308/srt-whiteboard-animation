@@ -63,7 +63,7 @@ RENDERER_HASH = hashlib.sha256(b"".join(
     (SCRIPTS / f).read_bytes() for f in ("render_stream_whiteboard.py", "stream_render.py"))).hexdigest()[:16]
 SVG_BUILDER_HASH = hashlib.sha256((SCRIPTS / "svg_scene.py").read_bytes()).hexdigest()[:16]
 SR = wv.SAMPLE_RATE
-PEN_VOLUME_DB = -20.0     # pen scratch level before mastering (audible, under the voice)
+PEN_VOLUME_DB = -23.0     # pen scratch level before mastering (audible, well under the voice even on phone speakers)
 SYNC_LATE_MS = 400       # pen down this long after its phrase is spoken reads as "drawing lags the voice"
 
 
