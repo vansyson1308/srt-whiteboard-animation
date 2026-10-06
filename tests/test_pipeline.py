@@ -339,3 +339,16 @@ def test_hand_leaves_during_pauses_and_fillers_use_them(tmp_path):
     first_star = next(i for i, f in enumerate(sink.frames) if not blank(f, star))
     assert 5 < first_star < b_start and not blank(sink.frames[b_start - 1], star)  # doodled in the pause
     assert np.abs(sink.frames[-1].astype(int) - r.color[:540, :960].astype(int)).mean() < 1.0
+
+
+def test_pen_scratch_is_off_unless_enabled(tmp_path):
+    import make_video
+    import storyboard
+    fps, nf = 30, 60
+    voices = [make_video.SceneVoice(None, [], 0)]
+    act = [np.ones(nf, np.float32)]                                    # the pen is busy the whole scene
+    silent = make_video.build_audio(voices, [nf], fps, {}, tmp_path, act)
+    assert silent is None                                              # no voice, no music, no pen -> no track
+    on = make_video.build_audio(voices, [nf], fps, {"sfx": {"pen": True}}, tmp_path, act)
+    assert on is not None and float(np.max(np.abs(on))) > 1e-3         # opting in still gives the scratch
+    assert storyboard._BASE["sfx"]["pen"] is False                     # new storyboard projects start silent

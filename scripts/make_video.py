@@ -15,7 +15,7 @@ Pipeline
   4. render    scenes rendered in parallel, cached by content hash
   5. compose   per format (landscape 1920x1080, portrait 1080x1920, square 1080x1080):
                layout + header + karaoke captions + scene transitions
-  6. audio     voice + ducked background music + pen scratch SFX, normalised to -14 LUFS
+  6. audio     voice + ducked background music (+ optional pen scratch SFX), normalised to -14 LUFS
   7. QA        contact sheet + JSON report for every output
 
 Everything is frame-accurate: every scene has exactly round(ms*fps/1000) frames
@@ -63,7 +63,8 @@ RENDERER_HASH = hashlib.sha256(b"".join(
     (SCRIPTS / f).read_bytes() for f in ("render_stream_whiteboard.py", "stream_render.py"))).hexdigest()[:16]
 SVG_BUILDER_HASH = hashlib.sha256((SCRIPTS / "svg_scene.py").read_bytes()).hexdigest()[:16]
 SR = wv.SAMPLE_RATE
-PEN_VOLUME_DB = -23.0     # pen scratch level before mastering (audible, well under the voice even on phone speakers)
+PEN_SFX_DEFAULT = False   # pen scratch is off unless a project opts in with "sfx": {"pen": true}
+PEN_VOLUME_DB = -23.0     # pen scratch level before mastering when enabled (well under the voice even on phone speakers)
 SYNC_LATE_MS = 400       # pen down this long after its phrase is spoken reads as "drawing lags the voice"
 
 
@@ -528,12 +529,14 @@ def build_audio(voices: list[SceneVoice], scene_frames: list[int], fps: int, pro
         else:
             log(f"  [warn] music file not found: {mp}")
     sfx = proj.get("sfx") or {}
-    if sfx.get("pen", True) and activities:
+    pen_on = bool(sfx.get("pen", PEN_SFX_DEFAULT))
+    if pen_on and activities:
         act = np.concatenate([a[:nf] if len(a) >= nf else np.pad(a, (0, nf - len(a)))
                               for a, nf in zip(activities, scene_frames)])
         s = pen_sfx(act, fps, total) * (10 ** (float(sfx.get("volumeDb", PEN_VOLUME_DB)) / 20))
         mix = mix + s
-    if not has_voice and not music_cfg.get("file") and not sfx.get("pen", True):
+    has_track = any(v.audio is not None for v in voices)      # a (possibly silent) narration track exists
+    if not has_track and not music_cfg.get("file") and not pen_on:
         return None
     lufs = float(proj.get("audio_master", {}).get("lufs", -14.0))
     return wv.normalize_loudness(mix, lufs) if has_voice or music_cfg.get("file") else mix

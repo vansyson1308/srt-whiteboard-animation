@@ -6,7 +6,7 @@
   "voice": { "engine": "edge", "voice": "vi-VN-NamMinhNeural", "rate": "+8%" },
   "captions": { "enabled": true, "karaoke": true, "maxWords": 6 },
   "render": { "camera": "follow", "cameraMaxZoom": 1.2 },
-  "sfx": { "pen": true, "volumeDb": -20 },
+  "sfx": { "pen": false, "volumeDb": -20 },
   "transition": { "type": "fade", "ms": 350 },
   "scenes": [
     {

@@ -4,7 +4,7 @@ Biến **một chủ đề, một kịch bản (kể cả rất dài), hoặc fi
 
 - một bàn tay cầm bút vẽ từng nét **đúng lúc lời thoại nhắc tới**, tô màu, camera bám theo chỗ đang vẽ;
 - giọng đọc tiếng Việt **có nhịp như người dẫn chương trình** (ngừng trước điểm nhấn, tách hai vế đối xứng, trình bày luận điểm từng ý);
-- phụ đề karaoke, nhạc nền tự tạo, tiếng bút sột soạt;
+- phụ đề karaoke, nhạc nền tự tạo (tiếng bút sột soạt có sẵn nhưng mặc định tắt);
 - xuất **16:9 cho YouTube / truyền hình**, **9:16 cho TikTok/Shorts** và **1:1** từ cùng một dự án.
 
 Repo được thiết kế để **một agent (Claude Code, Codex…) làm trọn một video từ một câu lệnh**: chắt lọc kịch bản, vẽ cảnh bằng SVG, chạy một lệnh ra MP4, tự soát ảnh QA, rồi giao file.
@@ -199,7 +199,7 @@ video.json
   ├─ 2. voice    TTS từng câu → chuẩn hoá khoảng nghỉ → nhịp đọc → timestamp từng từ (tts.py, voice_studio.py)
   ├─ 3. sync     phần tử bắt đầu vẽ khi cụm data-say được đọc, theo thứ tự được nói (timing.py)
   ├─ 4. render   vẽ từng cảnh song song: nét bút, tô màu, bàn tay, camera (render_stream_whiteboard.py)
-  ├─ 5. audio    giọng + nhạc nền (tự hạ khi có giọng) + tiếng bút → chuẩn hoá loudness
+  ├─ 5. audio    giọng + nhạc nền (tự hạ khi có giọng) [+ tiếng bút nếu bật] → chuẩn hoá loudness
   └─ 6. compose  ghép cảnh, chuyển cảnh, phụ đề karaoke, xuất từng định dạng + QA
 ```
 
