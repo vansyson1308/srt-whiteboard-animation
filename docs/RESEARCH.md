@@ -23,7 +23,7 @@ Repo gốc (`srt-whiteboard-animation`, MIT) có ý tưởng tốt – "mask cho
 - **Tự chia vùng ảnh raster** (`auto_annotate.py`): tách vật thể, bỏ qua đường nền nối các vật, thứ tự đọc.
 - **Giọng đọc tiếng Việt miễn phí** (edge-tts: HoaiMy nữ / NamMinh nam) có timestamp từng từ; ElevenLabs (timestamp ký tự), OpenAI TTS (ước lượng); căn chỉnh từ ở mức ký tự (xử lý "năm 2024", "365,25"…).
 - **Đồng bộ "nói tới đâu vẽ tới đó"**: `data-say` trên từng phần tử.
-- **Dựng hoàn chỉnh**: 16:9 + 9:16 (vùng an toàn TikTok) + 1:1, phụ đề karaoke tiếng Việt (Be Vietnam Pro), tiêu đề cho bản dọc, chuyển cảnh, nhạc nền tự hạ khi có giọng (ducking), tiếng bút sột soạt tổng hợp, chuẩn hoá **-14 LUFS**, xuất SRT, contact sheet QA, báo cáo JSON.
+- **Dựng hoàn chỉnh**: 16:9 + 9:16 (vùng an toàn TikTok) + 1:1, phụ đề karaoke tiếng Việt (Be Vietnam Pro), tiêu đề cho bản dọc, chuyển cảnh, nhạc nền tự hạ khi có giọng (ducking), tiếng bút sột soạt tổng hợp (mặc định tắt), chuẩn hoá **-14 LUFS**, xuất SRT, contact sheet QA, báo cáo JSON.
 - **Cache theo nội dung** + render song song: sửa một cảnh chỉ render lại cảnh đó.
 - **Test tự động** (14 test, chạy offline) + CI.
 
@@ -41,7 +41,7 @@ Top tính năng giữ chân người xem (tổng hợp từ VideoScribe, Doodly,
 | 6 | Tô màu sau khi vẽ nét | ✅ contour-wipe / brush / fade |
 | 7 | Phụ đề karaoke trong vùng an toàn | ✅ |
 | 8 | Chữ viết tay từng nét | ✅ (quét trái→phải; chưa theo nét glyph) |
-| 9 | Âm thanh: tiếng bút, nhạc ducking, -14 LUFS | ✅ (chưa có "whoosh" chuyển cảnh) |
+| 9 | Âm thanh: tiếng bút (tuỳ chọn, mặc định tắt), nhạc ducking, -14 LUFS | ✅ (chưa có "whoosh" chuyển cảnh) |
 | 10 | Chuyển cảnh, không đứng yên > 2–3s | ✅ fade/slide, camera luôn chuyển động |
 
 ## 4. Nguồn lực bên ngoài đáng dùng

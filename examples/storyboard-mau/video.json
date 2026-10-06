@@ -19,8 +19,8 @@
     "duckDb": -8
   },
   "sfx": {
-    "pen": true,
-    "volumeDb": -22
+    "pen": false,
+    "volumeDb": -25
   },
   "render": {
     "camera": "follow",

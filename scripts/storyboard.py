@@ -49,7 +49,7 @@ _BASE = {
     "voice": {"engine": "vieneu", "voice": "Hải Đăng", "style": "natural", "pauseScale": 1.1},
     "captions": {"enabled": True, "karaoke": True, "maxWords": 7},
     "music": {"generate": "calm", "volumeDb": -27, "duck": True, "duckDb": -8},
-    "sfx": {"pen": True, "volumeDb": -25},
+    "sfx": {"pen": False, "volumeDb": -25},      # pen scratch off by default; set "pen": True to bring it back
     "render": {"camera": "follow", "cameraMaxZoom": 1.2},
     "transition": {"type": "fade", "ms": 400},
 }

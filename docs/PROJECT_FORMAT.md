@@ -32,7 +32,7 @@ Một thư mục dự án = một video. Mọi đường dẫn là tương đố
   "header": { "text": "Tiêu đề hiện ở bản dọc" },   // false để tắt; mặc định = title
   "music":  { "file": "music/nhac-nen.mp3", "volumeDb": -20, "duck": true, "duckDb": -8 },
                                              // hoặc {"generate": "calm"|"bright"} = nhạc tự tạo, không bản quyền
-  "sfx":    { "pen": true, "volumeDb": -23 },       // tiếng bút sột soạt khi đang vẽ
+  "sfx":    { "pen": false, "volumeDb": -23 },      // tiếng bút sột soạt khi vẽ: mặc định TẮT, đặt "pen": true để bật lại
   "render": { "inkPath": "skeleton", "colorFill": "contour-wipe", "camera": "follow",
               "cameraMaxZoom": 1.2, "paper": "#F6F1E3", "hand": null, "handHeightRatio": 0.42,
               "humanMotion": true,                  // nhịp tay người: chậm ở góc/cuối nét, dừng khi đặt/nhấc bút
