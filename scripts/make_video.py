@@ -807,12 +807,17 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
               "sync": sync, "outputs": []}
     scenes_media = [{"video": j["out"], "frames": nf} for j, nf in zip(jobs_list, scene_frames)]
     aspect = float(np.median(aspects)) if aspects else 16 / 9
+    composed = []
     for fmt in formats:
         if fmt not in FORMATS:
             raise ValueError(f"unknown format '{fmt}' (use {list(FORMATS)})")
         out = odir / f"{name}-{fmt}{'-draft' if draft else ''}.mp4"
         log(f"-- compose {fmt} -> {out.name}")
         compose(fmt, proj, scenes_media, words_abs, audio, out, draft, aspect)
+        composed.append((fmt, out))
+    del audio                                  # QA decodes each file's audio again: free the mix first
+    gc.collect()
+    for fmt, out in composed:
         sheet = odir / f"{out.stem}-qa.jpg"
         rep = qa_frames.contact_sheet(str(out), str(sheet), count=12, cols=4,
                                       tile_w=360 if fmt != "portrait" else 220)

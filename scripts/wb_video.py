@@ -134,8 +134,16 @@ def load_audio(path: str | Path, sample_rate: int = SAMPLE_RATE, stereo: bool = 
             chunks.append(rf.to_ndarray())
     if not chunks:
         return np.zeros((0, 2) if stereo else 0, np.float32)
-    a = np.concatenate(chunks, axis=1).astype(np.float32)
-    return a.T if stereo else a[0]
+    # copy the decoded frames into one preallocated buffer, freeing each as it goes:
+    # an hour of audio then needs one extra copy at most, not three
+    out = np.empty((sum(c.shape[1] for c in chunks), chunks[0].shape[0]), np.float32)
+    chunks.reverse()
+    i = 0
+    while chunks:
+        c = chunks.pop()
+        out[i:i + c.shape[1]] = c.T
+        i += c.shape[1]
+    return out if stereo else out.reshape(-1)
 
 
 def audio_duration_ms(path: str | Path) -> int:
