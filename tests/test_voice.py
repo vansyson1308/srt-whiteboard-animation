@@ -379,6 +379,23 @@ def test_block_fft_filter_matches_one_shot_and_envelope_is_exact():
     assert abs(wb_video.loudness_lufs(x) - wb_video.loudness_lufs(x * 2) + 6.02) < 0.05
 
 
+def test_long_track_helpers_match_and_loop_is_seamless():
+    rng = np.random.default_rng(5)
+    x = (rng.standard_normal((SR * 3 + 777, 2)) * 0.1).astype(np.float32)
+    x[SR:SR * 2] = 0
+    assert np.allclose(wb_video.rms_envelope(x, step=240), wb_video.rms_envelope(x)[::240], atol=1e-12)
+    music = (rng.standard_normal(x.shape) * 0.2).astype(np.float32)
+    ref = wb_video.duck_music(music.copy(), x, -27, -8)
+    m = music.copy()
+    out = wb_video.duck_music(m, x, -27, -8, inplace=True)
+    assert np.shares_memory(out, m) and np.array_equal(out, ref)
+    import gen_music
+    loop = gen_music.generate_loop(24, "calm")                 # two 12 s chord cycles at 80 bpm
+    assert len(loop) == 24 * SR and np.abs(loop).max() <= 0.8 + 1e-6
+    jumps = np.abs(np.diff(np.concatenate([loop, loop])[:, 0]))
+    assert jumps[len(loop) - 1] <= np.percentile(jumps, 99.9)   # no click where the loop wraps
+
+
 def test_shape_pauses_follows_punctuation():
     text = ("Một hai ba bốn năm sáu bảy tám, chín mười mười một mười hai mười ba mười bốn: "
             "mười lăm mười sáu mười bảy mười tám.")

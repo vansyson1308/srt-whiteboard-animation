@@ -64,7 +64,8 @@ def _lowpass(a: np.ndarray, cutoff: float) -> np.ndarray:
     return wv.fft_filter(a, lambda f: 1 / np.sqrt(1 + (f / cutoff) ** 4))
 
 
-def generate(seconds: float, style: str = "calm", bpm: float | None = None, seed: int = 3) -> np.ndarray:
+def _render(seconds: float, style: str, bpm: float | None, seed: int) -> tuple[np.ndarray, float]:
+    """Dry mix (no filter, room or fade) of whole bars covering ``seconds``; returns (buffer, bar length)."""
     root, prog, default_bpm = STYLES.get(style, STYLES["calm"])
     bpm = bpm or default_bpm
     beat = 60.0 / bpm
@@ -95,15 +96,46 @@ def generate(seconds: float, style: str = "calm", bpm: float | None = None, seed
                  pan=0.35 if s % 2 else -0.35, gain=vel)
         t += bar
         i += 1
+    return buf, bar * len(prog)
+
+
+ROOM = ((0.11, 0.22), (0.23, 0.12))              # two short feedback-less echoes (s, gain)
+
+
+def generate(seconds: float, style: str = "calm", bpm: float | None = None, seed: int = 3) -> np.ndarray:
+    buf, _ = _render(seconds, style, bpm, seed)
     buf = _lowpass(buf, 5200)
     # simple room: two short feedback-less echoes
-    for d, g in ((0.11, 0.22), (0.23, 0.12)):
+    for d, g in ROOM:
         k = int(d * SR)
         buf[k:] += buf[:-k] * g
     buf = buf[:int(seconds * SR)]
     buf = wv.fade(buf, 1500, 2500)
     peak = float(np.max(np.abs(buf))) or 1.0
     return (buf / peak * 0.8).astype(np.float32)
+
+
+def generate_loop(seconds: float, style: str = "calm", bpm: float | None = None, seed: int = 3) -> np.ndarray:
+    """A seamless loop of whole chord cycles, about ``seconds`` long and with no fades:
+    tiled end to end it plays without a seam, so an hour of music costs one loop's memory.
+    The tails ringing past the loop end are folded back onto its start, and the filter and
+    room are applied circularly."""
+    _, cycle = _render(0.001, style, bpm, seed)
+    n_cycles = max(1, round(seconds / cycle))
+    length = int(round(n_cycles * cycle * SR))
+    buf, _ = _render(n_cycles * cycle - 1e-6, style, bpm, seed)
+    buf = np.concatenate([buf, np.zeros((max(0, 2 * length - len(buf)), 2), np.float32)])
+    loop = buf[:length].copy()
+    for s0 in range(length, len(buf), length):          # fold ringing tails back onto the start
+        seg = buf[s0:s0 + length]
+        loop[:len(seg)] += seg
+    pad = wv.FFT_PAD
+    ext = np.concatenate([loop[-pad:], loop, loop[:pad]])
+    loop = _lowpass(ext, 5200)[pad:pad + length]
+    for d, g in ROOM:                                     # same room as generate(), wrapping around
+        loop = loop + np.roll(loop, int(d * SR), axis=0) * g
+    peak = float(np.max(np.abs(loop))) or 1.0
+    return (loop / peak * 0.8).astype(np.float32)
 
 
 def main(argv=None) -> int:
