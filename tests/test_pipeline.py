@@ -304,6 +304,32 @@ def test_share_video_parts_rebuild_original(tmp_path):
     assert rebuilt == data and all(p["size"] <= 1024 * 1024 for p in m["parts"])
 
 
+def test_share_video_splits_big_files_over_pages(tmp_path):
+    import hashlib
+    import re
+
+    import share_video
+    src = tmp_path / "long.mp4"
+    data = np.random.default_rng(4).integers(0, 256, 5_000_000, dtype=np.uint8).tobytes()
+    src.write_bytes(data)
+    out = tmp_path / "share"
+    assert share_video.main([str(src), "--out-dir", str(out), "--chunk-mb", "1", "--page-mb", "2"]) == 0
+    assert not (out / "index.html").exists()
+    pages = sorted(out.glob("page-*/index.html"))
+    assert [q.parent.name for q in pages] == ["page-1", "page-2", "page-3"]
+    ms = [json.loads(re.search(r'id="manifest">(.*?)</script>', q.read_text(encoding="utf-8"), re.S).group(1))
+          for q in pages]
+    segs = ms[0]["segments"]
+    assert all(m["segments"] == segs and m["pages"] == 3 and m["page"] == k for k, m in enumerate(ms, 1))
+    assert ms[-1]["sha256"] == hashlib.sha256(data).hexdigest() and ms[-1]["size"] == len(data)
+    joined = b""
+    for q, m, g in zip(pages, ms, segs):
+        seg = b"".join((q.parent / p["path"]).read_bytes() for p in m["parts"])
+        assert len(seg) == g["size"] <= 2 * 1024 * 1024 and hashlib.sha256(seg).hexdigest() == g["sha256"]
+        joined += seg
+    assert joined == data and segs[0]["filename"] == "long-phan-1-of-3.mp4"
+
+
 def test_hand_leaves_during_pauses_and_fillers_use_them(tmp_path):
     import cv2
     from render_stream_whiteboard import load_label_map

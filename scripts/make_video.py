@@ -63,6 +63,8 @@ RENDERER_HASH = hashlib.sha256(b"".join(
     (SCRIPTS / f).read_bytes() for f in ("render_stream_whiteboard.py", "stream_render.py"))).hexdigest()[:16]
 SVG_BUILDER_HASH = hashlib.sha256((SCRIPTS / "svg_scene.py").read_bytes()).hexdigest()[:16]
 SR = wv.SAMPLE_RATE
+MUSIC_LOOP_ABOVE_S = 900   # generated music longer than this is one seamless loop, tiled
+MUSIC_LOOP_S = 240
 PEN_SFX_DEFAULT = False   # pen scratch is off unless a project opts in with "sfx": {"pen": true}
 PEN_VOLUME_DB = -23.0     # pen scratch level before mastering when enabled (well under the voice even on phone speakers)
 SYNC_LATE_MS = 400       # pen down this long after its phrase is spoken reads as "drawing lags the voice"
@@ -498,34 +500,42 @@ def build_audio(voices: list[SceneVoice], scene_frames: list[int], fps: int, pro
         a = v.audio if v.audio is not None else np.zeros((0, 2), np.float32)
         parts.append(wv.fit_length(a, n))
     voice = np.concatenate(parts) if parts else np.zeros((0, 2), np.float32)
+    del parts
     total = len(voice)
-    mix = voice.copy()
+    mix = voice                                # never modified in place; every step below makes a new array
     music_cfg = dict(proj.get("music") or {})
     if music_cfg.get("generate") and not music_cfg.get("file"):
         import gen_music
         style = music_cfg["generate"]
         style = style if isinstance(style, str) and style in gen_music.STYLES else "calm"
         secs = int(math.ceil(total / SR))          # the cached file always covers the whole video
-        gp = pdir / "build" / f"music-{style}-{secs}s.wav"
+        if secs > MUSIC_LOOP_ABOVE_S:              # long video: one seamless loop, tiled below
+            gp = pdir / "build" / f"music-{style}-loop{MUSIC_LOOP_S}s.wav"
+            make = lambda: gen_music.generate_loop(MUSIC_LOOP_S, style)  # noqa: E731
+        else:
+            gp = pdir / "build" / f"music-{style}-{secs}s.wav"
+            make = lambda: gen_music.generate(secs + 0.5, style)  # noqa: E731
         if not gp.exists():
             log(f"  generating {style} background music ({secs}s)")
             gp.parent.mkdir(parents=True, exist_ok=True)
-            wv.save_wav(gp, gen_music.generate(secs + 0.5, style))
+            wv.save_wav(gp, make())
         music_cfg["file"] = str(gp)
     if music_cfg.get("file"):
         mp = pdir / music_cfg["file"]
         if mp.exists():
             m = wv.load_audio(mp)
             if len(m):
-                reps = int(math.ceil(total / len(m)))
-                m = np.concatenate([m] * max(1, reps))[:total]
-                m = wv.fade(m, 800, 1500)
+                m = np.resize(m, (total,) + m.shape[1:])          # tile end to end
+                wv.fade(m, 800, 1500, inplace=True)
                 base = float(music_cfg.get("volumeDb", -20))
                 if has_voice and music_cfg.get("duck", True):
-                    m = wv.duck_music(m, voice, base_gain_db=base, duck_db=float(music_cfg.get("duckDb", -8)))
+                    m = wv.duck_music(m, voice, base_gain_db=base, duck_db=float(music_cfg.get("duckDb", -8)),
+                                      inplace=True)
                 else:
-                    m = m * (10 ** (base / 20))
-                mix = mix + m
+                    m *= np.float32(10 ** (base / 20))
+                m += voice                             # m is our own buffer: mix into it, no extra copy
+                mix = m
+                del m
         else:
             log(f"  [warn] music file not found: {mp}")
     sfx = proj.get("sfx") or {}
@@ -535,6 +545,7 @@ def build_audio(voices: list[SceneVoice], scene_frames: list[int], fps: int, pro
                               for a, nf in zip(activities, scene_frames)])
         s = pen_sfx(act, fps, total) * (10 ** (float(sfx.get("volumeDb", PEN_VOLUME_DB)) / 20))
         mix = mix + s
+    del voice
     has_track = any(v.audio is not None for v in voices)      # a (possibly silent) narration track exists
     if not has_track and not music_cfg.get("file") and not pen_on:
         return None
@@ -796,12 +807,17 @@ def run(project_path: Path, formats: list[str] | None = None, draft: bool = Fals
               "sync": sync, "outputs": []}
     scenes_media = [{"video": j["out"], "frames": nf} for j, nf in zip(jobs_list, scene_frames)]
     aspect = float(np.median(aspects)) if aspects else 16 / 9
+    composed = []
     for fmt in formats:
         if fmt not in FORMATS:
             raise ValueError(f"unknown format '{fmt}' (use {list(FORMATS)})")
         out = odir / f"{name}-{fmt}{'-draft' if draft else ''}.mp4"
         log(f"-- compose {fmt} -> {out.name}")
         compose(fmt, proj, scenes_media, words_abs, audio, out, draft, aspect)
+        composed.append((fmt, out))
+    del audio                                  # QA decodes each file's audio again: free the mix first
+    gc.collect()
+    for fmt, out in composed:
         sheet = odir / f"{out.stem}-qa.jpg"
         rep = qa_frames.contact_sheet(str(out), str(sheet), count=12, cols=4,
                                       tile_w=360 if fmt != "portrait" else 220)

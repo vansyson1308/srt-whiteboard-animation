@@ -70,11 +70,10 @@ class VideoSink:
         a = self.audio
         if a.ndim == 1:
             a = np.stack([a, a], axis=1)
-        a = np.clip(a, -1.0, 1.0).astype(np.float32)
         chunk = 1024
         pts = 0
         for i in range(0, len(a), chunk):
-            block = np.ascontiguousarray(a[i:i + chunk].T)  # planar (2, n)
+            block = np.ascontiguousarray(np.clip(a[i:i + chunk], -1.0, 1.0).T, dtype=np.float32)  # planar (2, n)
             frame = self.av.AudioFrame.from_ndarray(block, format="fltp", layout="stereo")
             frame.sample_rate = self.sample_rate
             frame.pts = pts
@@ -135,8 +134,16 @@ def load_audio(path: str | Path, sample_rate: int = SAMPLE_RATE, stereo: bool = 
             chunks.append(rf.to_ndarray())
     if not chunks:
         return np.zeros((0, 2) if stereo else 0, np.float32)
-    a = np.concatenate(chunks, axis=1).astype(np.float32)
-    return a.T if stereo else a[0]
+    # copy the decoded frames into one preallocated buffer, freeing each as it goes:
+    # an hour of audio then needs one extra copy at most, not three
+    out = np.empty((sum(c.shape[1] for c in chunks), chunks[0].shape[0]), np.float32)
+    chunks.reverse()
+    i = 0
+    while chunks:
+        c = chunks.pop()
+        out[i:i + c.shape[1]] = c.T
+        i += c.shape[1]
+    return out if stereo else out.reshape(-1)
 
 
 def audio_duration_ms(path: str | Path) -> int:
@@ -169,14 +176,30 @@ def save_wav(path: str | Path, a: np.ndarray, sample_rate: int = SAMPLE_RATE) ->
     return path
 
 
-def rms_envelope(a: np.ndarray, win_ms: float = 50.0) -> np.ndarray:
-    """Centred moving RMS (O(n) running sum, so hour-long tracks stay fast)."""
-    mono = a.mean(axis=1) if a.ndim == 2 else a
+def rms_envelope(a: np.ndarray, win_ms: float = 50.0, step: int = 1) -> np.ndarray:
+    """Centred moving RMS, sampled every ``step`` samples (``step=1``: one value per sample).
+
+    Computed chunk by chunk with a local running sum, so memory stays bounded
+    (a few tens of MB) and time stays linear even for a 90-minute track.
+    """
+    n = len(a)
     win = max(1, int(SAMPLE_RATE * win_ms / 1000))
-    sq = np.zeros(len(mono) + win, np.float64)
-    sq[win // 2 + 1:win // 2 + 1 + len(mono)] = np.square(mono, dtype=np.float64)
-    c = np.cumsum(sq)
-    return np.sqrt(np.maximum((c[win:] - c[:-win]) / win, 0.0))
+    h = win // 2
+    step = max(1, int(step))
+    out = np.empty((n + step - 1) // step, np.float64)
+    chunk = step * max(1, (1 << 22) // step)
+    for s in range(0, n, chunk):
+        e = min(n, s + chunk)
+        lo, hi = s - h, e - 1 + win - h          # env[i] averages x[j] for j in [i-h, i-h+win)
+        a0, b0 = max(lo, 0), min(hi, n)
+        seg = np.zeros(hi - lo, np.float64)
+        x = a[a0:b0]
+        x = x.mean(axis=1) if x.ndim == 2 else x
+        seg[a0 - lo:b0 - lo] = np.square(x, dtype=np.float64)
+        c = np.concatenate([[0.0], np.cumsum(seg)])
+        ii = np.arange(0, e - s, step)
+        out[s // step:s // step + len(ii)] = np.sqrt(np.maximum((c[ii + win] - c[ii]) / win, 0.0))
+    return out
 
 
 FFT_BLOCK = 1 << 20          # ~22 s at 48 kHz
@@ -200,6 +223,14 @@ def fft_filter(x: np.ndarray, response, block: int = FFT_BLOCK, pad: int = FFT_P
     out = np.empty(xx.shape, np.float32)
     if n == 0:
         return out[:, 0] if mono else out
+    for s, y in _fft_filter_blocks(xx, response, block, pad):
+        out[s:s + len(y)] = y
+    return out[:, 0] if mono else out
+
+
+def _fft_filter_blocks(xx: np.ndarray, response, block: int = FFT_BLOCK, pad: int = FFT_PAD):
+    """Yield ``(start, filtered_block)`` for a 2-D signal; see :func:`fft_filter`."""
+    n = len(xx)
     nfft = block + 2 * pad
     h = np.asarray(response(np.fft.rfftfreq(nfft, 1.0 / SAMPLE_RATE)), np.float64)[:, None]
     seg = np.empty((nfft, xx.shape[1]), np.float64)
@@ -209,20 +240,21 @@ def fft_filter(x: np.ndarray, response, block: int = FFT_BLOCK, pad: int = FFT_P
         seg[:b - a] = xx[a:b]
         y = np.fft.irfft(np.fft.rfft(seg, axis=0) * h, n=nfft, axis=0)
         k = min(block, n - s)
-        out[s:s + k] = y[s - a:s - a + k]
-    return out[:, 0] if mono else out
+        yield s, y[s - a:s - a + k].astype(np.float32)
 
 
 def duck_music(music: np.ndarray, voice: np.ndarray, base_gain_db: float = -18.0,
-               duck_db: float = -10.0, attack_ms: float = 60, release_ms: float = 400) -> np.ndarray:
-    """Scale music to ``base_gain_db`` and dip a further ``duck_db`` while the voice speaks."""
+               duck_db: float = -10.0, attack_ms: float = 60, release_ms: float = 400,
+               inplace: bool = False) -> np.ndarray:
+    """Scale music to ``base_gain_db`` and dip a further ``duck_db`` while the voice speaks.
+
+    ``inplace=True`` writes into ``music`` (when it already has the voice's length)
+    instead of allocating a second hour-long buffer."""
     n = len(voice)
     music = fit_length(music, n)
-    env = rms_envelope(voice)
-    speaking = (env > 0.01).astype(np.float32)
     # asymmetric smoothing (fast attack, slow release), decimated for speed
     step = 240
-    s = speaking[::step]
+    s = (rms_envelope(voice, step=step) > 0.01).astype(np.float32)
     out = np.empty_like(s)
     a_att = 1 - math.exp(-step / (SAMPLE_RATE * attack_ms / 1000))
     a_rel = 1 - math.exp(-step / (SAMPLE_RATE * release_ms / 1000))
@@ -230,10 +262,15 @@ def duck_music(music: np.ndarray, voice: np.ndarray, base_gain_db: float = -18.0
     for i, x in enumerate(s):
         v += (x - v) * (a_att if x > v else a_rel)
         out[i] = v
-    duck = np.repeat(out, step)[:n]
-    gain_db = base_gain_db + duck_db * duck
-    gain = (10 ** (gain_db / 20)).astype(np.float32)
-    return music * (gain[:, None] if music.ndim == 2 else gain)
+    res = music if inplace and music.dtype == np.float32 and len(music) == n and music.flags.writeable \
+        else np.empty(music.shape, np.float32)
+    chunk = step * (1 << 14)                   # bounded temporaries for hour-long tracks
+    for c0 in range(0, n, chunk):
+        c1 = min(n, c0 + chunk)
+        duck = np.repeat(out[c0 // step:(c1 + step - 1) // step], step)[:c1 - c0]
+        gain = (10 ** ((base_gain_db + duck_db * duck) / 20)).astype(np.float32)
+        res[c0:c1] = music[c0:c1] * (gain[:, None] if music.ndim == 2 else gain)
+    return res
 
 
 def polish_voice(a: np.ndarray, preset: str = "broadcast") -> np.ndarray:
@@ -357,8 +394,9 @@ def apply_prosody(x: np.ndarray, rate_pct: float = 0.0, semitones: float = 0.0, 
     return y
 
 
-def fade(a: np.ndarray, in_ms: float = 0, out_ms: float = 0) -> np.ndarray:
-    a = a.copy()
+def fade(a: np.ndarray, in_ms: float = 0, out_ms: float = 0, inplace: bool = False) -> np.ndarray:
+    if not inplace:
+        a = a.copy()
     for ms, rev in ((in_ms, False), (out_ms, True)):
         n = min(len(a), int(SAMPLE_RATE * ms / 1000))
         if n <= 0:
@@ -392,17 +430,24 @@ def _k_weight(x: np.ndarray) -> np.ndarray:
 def loudness_lufs(a: np.ndarray) -> float:
     """Integrated loudness (BS.1770 K-weighting + absolute/relative gating)."""
     x = a if a.ndim == 2 else a[:, None]
-    if len(x) == 0:
+    n = len(x)
+    if n == 0:
         return -70.0
-    y = _k_weight(x).astype(np.float64)
     block, hop = int(0.4 * SAMPLE_RATE), int(0.1 * SAMPLE_RATE)
-    sq = np.sum(y ** 2, axis=1)
-    if len(sq) < block:
-        ms = float(np.mean(sq))
+    # per-hop sums of the K-weighted power, accumulated block by block (bounded memory)
+    hs = np.zeros(n // hop + 1, np.float64)
+    total = 0.0
+    for s0, y in _fft_filter_blocks(x, _k_response):
+        sq = np.sum(np.square(y, dtype=np.float64), axis=1)
+        total += float(np.sum(sq))
+        hs += np.bincount((np.arange(s0, s0 + len(sq)) // hop), weights=sq, minlength=len(hs))[:len(hs)]
+    if n < block:
+        ms = total / n
         return -0.691 + 10 * math.log10(ms) if ms > 0 else -70.0
-    c = np.concatenate([[0.0], np.cumsum(sq)])
-    starts = np.arange(0, len(sq) - block + 1, hop)
-    powers = (c[starts + block] - c[starts]) / block
+    k = block // hop                               # 4 hops per 400 ms block
+    nb = (n - block) // hop + 1
+    c = np.concatenate([[0.0], np.cumsum(hs)])
+    powers = (c[k:k + nb] - c[:nb]) / block
     powers = powers[powers > 0]
     if powers.size == 0:
         return -70.0
@@ -420,11 +465,15 @@ def normalize_loudness(a: np.ndarray, target_lufs: float = -14.0, true_peak_db: 
         return a
     cur = loudness_lufs(a)
     gain = 10 ** ((target_lufs - cur) / 20)
-    out = a * gain
-    peak = float(np.max(np.abs(out)))
+    out = np.empty(a.shape, np.float32)
+    chunk = 1 << 22                             # bounded temporaries for hour-long tracks
+    peak = max(float(np.max(np.abs(a[i:i + chunk]))) for i in range(0, len(a), chunk)) * gain
     lim = 10 ** (true_peak_db / 20)
-    if peak > lim:  # simple soft limiter on the peaks
-        k = lim
-        over = np.abs(out) > k * 0.8
-        out = np.where(over, np.sign(out) * (k * 0.8 + (k * 0.2) * np.tanh((np.abs(out) - k * 0.8) / (k * 0.2))), out)
-    return out.astype(np.float32)
+    k = lim
+    for i in range(0, len(a), chunk):
+        o = a[i:i + chunk] * gain
+        if peak > lim:  # simple soft limiter on the peaks
+            over = np.abs(o) > k * 0.8
+            o = np.where(over, np.sign(o) * (k * 0.8 + (k * 0.2) * np.tanh((np.abs(o) - k * 0.8) / (k * 0.2))), o)
+        out[i:i + chunk] = o
+    return out
